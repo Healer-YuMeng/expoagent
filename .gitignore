@@ -1,0 +1,106 @@
+# =====================================================
+# YCIS 招生系统 - Git 忽略规则
+# =====================================================
+
+# ========== 环境变量和敏感配置 ==========
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# ========== macOS ==========
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# ========== Python / FastAPI ==========
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.dist-info/
+.Python
+
+# ========== 虚拟环境 ==========
+venv/
+env/
+ENV/
+.venv
+.virtualenv
+pipenv/
+
+# ========== 数据库文件 ==========
+*.sqlite3
+*.db
+*.sqlite
+
+# ========== MongoDB 数据目录 ==========
+# 本地持久化的 MongoDB 数据（如果使用本地卷）
+data/
+mongodb_data/
+logs/
+*.log
+
+# ========== IDEs / Editors ==========
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*~
+.project
+.pydevproject
+.settings/
+
+# ========== Node.js / Vue / Vite ==========
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# ========== 构建产物 ==========
+build/
+*.egg-info/
+.eggs/
+lib/
+lib64/
+
+# ========== 测试和覆盖率 ==========
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# ========== Jupyter Notebook ==========
+.ipynb_checkpoints/
+
+# ========== 临时文件 ==========
+*.tmp
+*.bak
+*.backup
+.cache/
+tmp/
+temp/
+
+# ========== 其他 ==========
+.mypy_cache/
+.dmypy.json
+dmypy.json

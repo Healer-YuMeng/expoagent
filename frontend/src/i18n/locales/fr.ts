@@ -1,0 +1,45 @@
+import en from './en'
+
+export default {
+  ...en,
+  common: {
+    ...en.common,
+    home: 'Accueil',
+    login: 'Connexion',
+    send: 'Envoyer',
+    sending: 'Envoi...',
+    backToHome: 'Retour à l’accueil',
+  },
+  index: {
+    ...en.index,
+    title: 'École XX',
+    subtitle: 'Assistant intelligent des admissions',
+  },
+  chat: {
+    ...en.chat,
+    title: 'Assistant intelligent des admissions XX',
+    myConsultation: 'Ma consultation',
+    subtitle: 'N’hésitez pas à me poser toutes vos questions~',
+    inputPlaceholder: 'Saisissez votre question...',
+  },
+  login: {
+    ...en.login,
+    welcome: 'Bon retour',
+    subtitle: 'Connectez-vous à votre compte pour continuer',
+    phone: 'Numéro de téléphone',
+    phonePlaceholder: 'Entrez votre numéro de téléphone',
+    phoneRequired: 'Veuillez entrer votre numéro de téléphone',
+    phoneInvalid: 'Veuillez entrer un numéro de téléphone valide',
+    password: 'Mot de passe',
+    passwordPlaceholder: 'Entrez votre mot de passe',
+    passwordRequired: 'Veuillez entrer votre mot de passe',
+    passwordMinLength: 'Le mot de passe doit contenir au moins 6 caractères',
+    rememberMe: 'Se souvenir de moi',
+    forgotPassword: 'Mot de passe oublié ?',
+    loginButton: 'Se connecter',
+    loggingIn: 'Connexion...',
+    loginSuccess: 'Connexion réussie',
+    loginError: 'Numéro de téléphone ou mot de passe incorrect, veuillez réessayer',
+    forgotPasswordInfo: 'Veuillez contacter l’administrateur pour réinitialiser le mot de passe',
+  },
+}

@@ -1,0 +1,45 @@
+import en from './en'
+
+export default {
+  ...en,
+  common: {
+    ...en.common,
+    home: 'Главная',
+    login: 'Войти',
+    send: 'Отправить',
+    sending: 'Отправка...',
+    backToHome: 'Вернуться на главную',
+  },
+  index: {
+    ...en.index,
+    title: 'Школа XX',
+    subtitle: 'Интеллектуальный помощник по приёму',
+  },
+  chat: {
+    ...en.chat,
+    title: 'Интеллектуальный помощник по приёму XX',
+    myConsultation: 'Моя консультация',
+    subtitle: 'Вы можете задать мне любой вопрос~',
+    inputPlaceholder: 'Введите ваш вопрос...',
+  },
+  login: {
+    ...en.login,
+    welcome: 'С возвращением',
+    subtitle: 'Войдите в свою учетную запись, чтобы продолжить',
+    phone: 'Номер телефона',
+    phonePlaceholder: 'Введите номер телефона',
+    phoneRequired: 'Введите номер телефона',
+    phoneInvalid: 'Введите корректный номер телефона',
+    password: 'Пароль',
+    passwordPlaceholder: 'Введите пароль',
+    passwordRequired: 'Введите пароль',
+    passwordMinLength: 'Пароль должен содержать не менее 6 символов',
+    rememberMe: 'Запомнить меня',
+    forgotPassword: 'Забыли пароль?',
+    loginButton: 'Войти',
+    loggingIn: 'Вход...',
+    loginSuccess: 'Вход выполнен успешно',
+    loginError: 'Неверный номер телефона или пароль. Попробуйте снова',
+    forgotPasswordInfo: 'Обратитесь к администратору для сброса пароля',
+  },
+}

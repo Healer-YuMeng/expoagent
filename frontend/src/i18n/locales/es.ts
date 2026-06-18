@@ -1,0 +1,45 @@
+import en from './en'
+
+export default {
+  ...en,
+  common: {
+    ...en.common,
+    home: 'Inicio',
+    login: 'Iniciar sesión',
+    send: 'Enviar',
+    sending: 'Enviando...',
+    backToHome: 'Volver al inicio',
+  },
+  index: {
+    ...en.index,
+    title: 'Escuela XX',
+    subtitle: 'Asistente inteligente de admisiones',
+  },
+  chat: {
+    ...en.chat,
+    title: 'Asistente inteligente de admisiones XX',
+    myConsultation: 'Mi consulta',
+    subtitle: 'No dude en hacerme cualquier pregunta~',
+    inputPlaceholder: 'Ingrese su pregunta...',
+  },
+  login: {
+    ...en.login,
+    welcome: 'Bienvenido de nuevo',
+    subtitle: 'Inicie sesión en su cuenta para continuar',
+    phone: 'Número de teléfono',
+    phonePlaceholder: 'Ingrese su número de teléfono',
+    phoneRequired: 'Ingrese su número de teléfono',
+    phoneInvalid: 'Ingrese un número de teléfono válido',
+    password: 'Contraseña',
+    passwordPlaceholder: 'Ingrese su contraseña',
+    passwordRequired: 'Ingrese su contraseña',
+    passwordMinLength: 'La contraseña debe tener al menos 6 caracteres',
+    rememberMe: 'Recordarme',
+    forgotPassword: '¿Olvidó su contraseña?',
+    loginButton: 'Iniciar sesión',
+    loggingIn: 'Iniciando sesión...',
+    loginSuccess: 'Inicio de sesión exitoso',
+    loginError: 'Número de teléfono o contraseña incorrectos. Inténtelo de nuevo',
+    forgotPasswordInfo: 'Comuníquese con el administrador para restablecer la contraseña',
+  },
+}
