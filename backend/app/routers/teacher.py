@@ -177,6 +177,26 @@ def _should_hide_teacher_message(message_doc: dict) -> bool:
     system_tag = metadata.get("system_tag")
     return system_tag in HIDDEN_TEACHER_MESSAGE_TAGS
 
+
+async def _get_lead_for_conversation(
+    db: PostgresCompatDatabase,
+    conversation_id: str,
+) -> dict[str, Any] | None:
+    return await db.leads.find_one(
+        build_lead_chat_lookup(conversation_id),
+        sort=[("updated_at", -1), ("created_at", -1)],
+    )
+
+
+def _compute_effective_ai_reply_enabled(
+    conversation: dict[str, Any],
+    lead: dict[str, Any] | None,
+) -> bool:
+    conversation_enabled = bool(conversation.get("ai_reply_enabled", True))
+    if not lead or "ai_reply_enabled" not in lead:
+        return conversation_enabled
+    return conversation_enabled and bool(lead.get("ai_reply_enabled", True))
+
 @router.get("/dashboard", summary="获取老师工作台摘要数据")
 async def get_teacher_dashboard(
     current_user: UserSchema = Depends(get_current_teacher),
@@ -482,6 +502,8 @@ async def get_conversation_messages(
     conversation = await db.conversations.find_one({"_id": {"$in": candidates}})
     if not conversation:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="会话不存在")
+    resolved_conversation_id = str(conversation.get("_id"))
+    lead = await _get_lead_for_conversation(db, resolved_conversation_id)
 
     base_filter = {"conversation_id": {"$in": candidates}}
     visible_messages: list[ConversationMessage] = []
@@ -510,7 +532,7 @@ async def get_conversation_messages(
     return ConversationMessagesResponse(
         total=total,
         items=items,
-        ai_reply_enabled=bool(conversation.get("ai_reply_enabled", True)),
+        ai_reply_enabled=_compute_effective_ai_reply_enabled(conversation, lead),
     )
 
 
@@ -532,15 +554,38 @@ async def update_conversation_ai_reply(
     if not conversation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="会话不存在")
 
-    await db.conversations.update_one(
-        {"_id": conversation["_id"]},
-        {"$set": {"ai_reply_enabled": bool(request.enabled), "updated_at": datetime.utcnow()}},
+    now = datetime.utcnow()
+    resolved_conversation_id = str(conversation.get("_id"))
+    lead = await _get_lead_for_conversation(db, resolved_conversation_id)
+
+    conversation_filter: dict[str, Any] = {"_id": conversation["_id"]}
+    parent_id = conversation.get("parent_id")
+    scope_school_id = (
+        (lead.get("school_id") if lead else None)
+        or conversation.get("school_id")
     )
+    if parent_id:
+        conversation_filter = {"parent_id": parent_id}
+        if scope_school_id:
+            conversation_filter["school_id"] = scope_school_id
+
+    await db.conversations.update_many(
+        conversation_filter,
+        {"$set": {"ai_reply_enabled": bool(request.enabled), "updated_at": now}},
+    )
+    if lead:
+        await db.leads.update_one(
+            {"_id": lead["_id"]},
+            {"$set": {"ai_reply_enabled": bool(request.enabled), "updated_at": now}},
+        )
+
     logger.info(
-        "Teacher %s set ai_reply_enabled=%s for conversation %s",
+        "Teacher %s set ai_reply_enabled=%s for conversation %s scope=%s lead=%s",
         current_user.id,
         request.enabled,
         conversation_id,
+        conversation_filter,
+        str(lead.get("_id")) if lead else None,
     )
     return {"conversation_id": conversation_id, "ai_reply_enabled": bool(request.enabled)}
 

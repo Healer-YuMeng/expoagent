@@ -716,6 +716,44 @@ async def _find_existing_lead_for_parent(
     return None
 
 
+async def _find_lead_for_ai_reply_scope(
+    *,
+    db: PostgresCompatDatabase,
+    conversation_id: str,
+    parent_id: str,
+    school_id: Optional[str],
+) -> Optional[dict]:
+    if conversation_id:
+        lead = await db.leads.find_one(
+            build_lead_chat_lookup(conversation_id),
+            {"_id": 1, "ai_reply_enabled": 1, "school_id": 1, "parent_id": 1},
+            sort=[("updated_at", -1), ("created_at", -1)],
+        )
+        if lead:
+            return lead
+
+    auto_lead_id = _build_auto_lead_id(parent_id, school_id)
+    lead = await db.leads.find_one(
+        {"_id": auto_lead_id},
+        {"_id": 1, "ai_reply_enabled": 1, "school_id": 1, "parent_id": 1},
+    )
+    if lead:
+        return lead
+
+    parent_id_candidates = _lead_identity_candidates(parent_id)
+    if not parent_id_candidates:
+        return None
+
+    lookup: dict[str, Any] = {"parent_id": {"$in": parent_id_candidates}}
+    if school_id:
+        lookup["school_id"] = school_id
+    return await db.leads.find_one(
+        lookup,
+        {"_id": 1, "ai_reply_enabled": 1, "school_id": 1, "parent_id": 1},
+        sort=[("updated_at", -1), ("created_at", -1)],
+    )
+
+
 def _has_complete_profile(info: Optional[dict]) -> bool:
     if not info:
         return False
@@ -729,6 +767,30 @@ async def _load_assistant(db: PostgresCompatDatabase, assistant_id: Optional[str
     if not assistant_id:
         return None
     return await AssistantService(db).get_assistant(assistant_id)
+
+
+def _normalize_message_assistant_id(message_doc: dict[str, Any]) -> str | None:
+    metadata = message_doc.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        return None
+    assistant_id = str(metadata.get("assistant_id") or "").strip()
+    return assistant_id or None
+
+
+def _should_include_message_in_assistant_history(
+    message_doc: dict[str, Any],
+    assistant_id: str | None,
+) -> bool:
+    if not assistant_id:
+        return True
+
+    sender_type = str(message_doc.get("sender_type") or "")
+    if sender_type == "parent":
+        return True
+
+    # 在助手严格隔离模式下，只保留当前助手自己生成的历史回复。
+    # 这样即便同一会话曾切换过其他助手，也不会把旧助手的回答继续喂给当前助手。
+    return _normalize_message_assistant_id(message_doc) == assistant_id
 
 
 async def _resolve_conversation_school_scope(
@@ -1143,7 +1205,10 @@ async def _postprocess_parent_reply(
                 conversation_id=conversation.id,
                 sender_type="bot",
                 content=_manual_callback_prompt_for(locale),
-                metadata={"system_tag": "manual_callback_prompt"},
+                metadata={
+                    "system_tag": "manual_callback_prompt",
+                    "assistant_id": conversation.assistant_id,
+                } if conversation.assistant_id else {"system_tag": "manual_callback_prompt"},
             )
             manual_result = await db.messages.insert_one(manual_message.model_dump())
             manual_message.id = str(manual_result.inserted_id)
@@ -1433,6 +1498,15 @@ async def create_conversation(
     if assistant and not assistant.get("is_active", True):
         raise HTTPException(status_code=400, detail="助手未启用")
     effective_school_id = request_data.school_id or (assistant.get("school_id") if assistant else None)
+    existing_lead = await _find_lead_for_ai_reply_scope(
+        db=db,
+        conversation_id="",
+        parent_id=str(parent_id),
+        school_id=effective_school_id,
+    )
+    initial_ai_reply_enabled = True
+    if existing_lead and "ai_reply_enabled" in existing_lead:
+        initial_ai_reply_enabled = bool(existing_lead.get("ai_reply_enabled", True))
 
     conversation_data = {
         "parent_id": parent_object_id,
@@ -1444,7 +1518,7 @@ async def create_conversation(
         "channel_appointment_logged": False,
         "school_id": effective_school_id,
         "assistant_id": assistant.get("id") if assistant else request_data.assistant_id,
-        "ai_reply_enabled": True,
+        "ai_reply_enabled": initial_ai_reply_enabled,
     }
     if channel_source:
         conversation_data["source_channel"] = channel_source
@@ -1460,6 +1534,7 @@ async def create_conversation(
         sender_type="bot",
         sender_name=str(assistant.get("name") or "助手") if assistant else "助手",
         content=welcome_text,
+        metadata={"assistant_id": assistant.get("id")} if assistant else None,
     )
     welcome_msg_dict = welcome_message.model_dump()
     welcome_result = await db.messages.insert_one(welcome_msg_dict)
@@ -1861,6 +1936,12 @@ async def send_message(
     conversation_school_id = conv_dict.get("school_id")
     conversation_assistant_id = (conv_dict.get("assistant_id") or "").strip() or None
     ai_reply_enabled = bool(conv_dict.get("ai_reply_enabled", True))
+    lead_ai_scope = await _find_lead_for_ai_reply_scope(
+        db=db,
+        conversation_id=conversation_id,
+        parent_id=str(current_user.id),
+        school_id=conversation_school_id,
+    )
     request_assistant_id = (request.assistant_id or "").strip() or None
     effective_assistant_id = conversation_assistant_id or request_assistant_id
     assistant = await _load_assistant(db, effective_assistant_id)
@@ -1967,6 +2048,8 @@ async def send_message(
         .sort("_id", 1)
     )
     async for msg_doc in history_cursor:
+        if not _should_include_message_in_assistant_history(msg_doc, effective_assistant_id):
+            continue
         sender_type = msg_doc.get("sender_type")
         if sender_type == "parent":
             role = "user"
@@ -1990,6 +2073,10 @@ async def send_message(
             latest_ai_reply_enabled = bool(
                 latest_conversation.get("ai_reply_enabled", ai_reply_enabled)
             ) if latest_conversation else ai_reply_enabled
+            if lead_ai_scope and "ai_reply_enabled" in lead_ai_scope:
+                latest_ai_reply_enabled = latest_ai_reply_enabled and bool(
+                    lead_ai_scope.get("ai_reply_enabled", True)
+                )
             if not latest_ai_reply_enabled:
                 yield f"data: {json.dumps({'event': 'ai_disabled'})}\n\n"
                 return
@@ -2063,6 +2150,7 @@ async def send_message(
                     conversation_id=conversation.id,
                     sender_type="bot",
                     content=parsed_answer,
+                    metadata={"assistant_id": effective_assistant_id} if effective_assistant_id else None,
                 )
 
                 bot_msg_dict = bot_message.model_dump()
@@ -2083,7 +2171,10 @@ async def send_message(
                             conversation_id=conversation.id,
                             sender_type="bot",
                             content=localized_manual_prompt,
-                            metadata={"system_tag": "manual_callback_prompt"},
+                            metadata={
+                                "system_tag": "manual_callback_prompt",
+                                "assistant_id": effective_assistant_id,
+                            } if effective_assistant_id else {"system_tag": "manual_callback_prompt"},
                         )
                         manual_result = await db.messages.insert_one(manual_message.model_dump())
                         manual_message.id = str(manual_result.inserted_id)

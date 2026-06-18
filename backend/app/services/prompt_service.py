@@ -154,13 +154,14 @@ class PromptService:
                 if locale:
                     candidate_queries.append({"key": key, "is_active": True, "assistant_id": assistant_id, "locale": locale})
                 candidate_queries.append({"key": key, "is_active": True, "assistant_id": assistant_id, "locale": None})
-            if school_id:
+            elif school_id:
                 if locale:
                     candidate_queries.append({"key": key, "is_active": True, "assistant_id": None, "school_id": school_id, "locale": locale})
                 candidate_queries.append({"key": key, "is_active": True, "assistant_id": None, "school_id": school_id, "locale": None})
-            if locale:
+            elif locale:
                 candidate_queries.append({"key": key, "is_active": True, "assistant_id": None, "school_id": None, "locale": locale})
-            candidate_queries.append({"key": key, "is_active": True, "assistant_id": None, "school_id": None, "locale": None})
+            if not assistant_id:
+                candidate_queries.append({"key": key, "is_active": True, "assistant_id": None, "school_id": None, "locale": None})
             for query in candidate_queries:
                 doc = await db[PROMPT_COLLECTION].find_one(query, sort=[("version", -1), ("updated_at", -1)])
                 if doc:
