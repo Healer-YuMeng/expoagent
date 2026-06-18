@@ -1,0 +1,17 @@
+.git
+.gitignore
+.vscode
+.env
+.env.*
+!.env.example
+frontend/node_modules
+frontend/dist
+backend/__pycache__
+backend/.pytest_cache
+backend/logs
+backend/tests/__pycache__
+**/.DS_Store
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.log

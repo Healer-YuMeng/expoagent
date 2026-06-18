@@ -1,0 +1,45 @@
+import en from './en'
+
+export default {
+  ...en,
+  common: {
+    ...en.common,
+    home: '홈',
+    login: '로그인',
+    send: '보내기',
+    sending: '전송 중...',
+    backToHome: '홈으로 돌아가기',
+  },
+  index: {
+    ...en.index,
+    title: 'XX학교',
+    subtitle: '스마트 입학 상담 도우미',
+  },
+  chat: {
+    ...en.chat,
+    title: 'XX 스마트 입학 상담 도우미',
+    myConsultation: '나의 상담',
+    subtitle: '궁금한 점이 있으면 언제든지 물어보세요~',
+    inputPlaceholder: '질문을 입력하세요...',
+  },
+  login: {
+    ...en.login,
+    welcome: '다시 오신 것을 환영합니다',
+    subtitle: '계속하려면 계정에 로그인하세요',
+    phone: '휴대폰 번호',
+    phonePlaceholder: '휴대폰 번호를 입력하세요',
+    phoneRequired: '휴대폰 번호를 입력하세요',
+    phoneInvalid: '유효한 휴대폰 번호를 입력하세요',
+    password: '비밀번호',
+    passwordPlaceholder: '비밀번호를 입력하세요',
+    passwordRequired: '비밀번호를 입력하세요',
+    passwordMinLength: '비밀번호는 최소 6자 이상이어야 합니다',
+    rememberMe: '로그인 상태 유지',
+    forgotPassword: '비밀번호를 잊으셨나요?',
+    loginButton: '로그인',
+    loggingIn: '로그인 중...',
+    loginSuccess: '로그인 성공',
+    loginError: '휴대폰 번호 또는 비밀번호가 올바르지 않습니다. 다시 시도해 주세요',
+    forgotPasswordInfo: '관리자에게 문의하여 비밀번호를 재설정하세요',
+  },
+}

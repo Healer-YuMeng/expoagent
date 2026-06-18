@@ -1,0 +1,45 @@
+import en from './en'
+
+export default {
+  ...en,
+  common: {
+    ...en.common,
+    home: 'ホーム',
+    login: 'ログイン',
+    send: '送信',
+    sending: '送信中...',
+    backToHome: 'ホームに戻る',
+  },
+  index: {
+    ...en.index,
+    title: 'XXスクール',
+    subtitle: 'スマート入学案内アシスタント',
+  },
+  chat: {
+    ...en.chat,
+    title: 'XXスマート入学案内アシスタント',
+    myConsultation: '私の相談',
+    subtitle: 'ご不明な点は何でもお気軽にご相談ください〜',
+    inputPlaceholder: 'ご質問を入力してください...',
+  },
+  login: {
+    ...en.login,
+    welcome: 'おかえりなさい',
+    subtitle: '続行するにはアカウントにログインしてください',
+    phone: '携帯番号',
+    phonePlaceholder: '携帯番号を入力してください',
+    phoneRequired: '携帯番号を入力してください',
+    phoneInvalid: '有効な携帯番号を入力してください',
+    password: 'パスワード',
+    passwordPlaceholder: 'パスワードを入力してください',
+    passwordRequired: 'パスワードを入力してください',
+    passwordMinLength: 'パスワードは6文字以上で入力してください',
+    rememberMe: 'ログイン状態を保持',
+    forgotPassword: 'パスワードをお忘れですか？',
+    loginButton: 'ログイン',
+    loggingIn: 'ログイン中...',
+    loginSuccess: 'ログイン成功',
+    loginError: '携帯番号またはパスワードが正しくありません。もう一度お試しください',
+    forgotPasswordInfo: '管理者に連絡してパスワードをリセットしてください',
+  },
+}
