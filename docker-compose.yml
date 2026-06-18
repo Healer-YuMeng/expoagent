@@ -43,7 +43,7 @@ services:
     volumes:
       - minio_data:/data
     ports:
-      - "${MINIO_API_PORT:-9002}:9000"
+      - "${MINIO_API_PORT:-9003}:9000"
       - "${MINIO_CONSOLE_PORT:-9004}:9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]

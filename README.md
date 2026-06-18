@@ -4,7 +4,7 @@
 | backend       | 9008 | 后端 API     |
 | postgres      | 5436 | PostgreSQL |
 | redis         | 6396 | Redis      |
-| minio api     | 9002 | MinIO API  |
+| minio api     | 9003 | MinIO API  |
 | minio console | 9004 | MinIO 控制台  |
 
 # general_agent / YCIS 智能招生助手
@@ -267,7 +267,7 @@ flowchart LR
 
 - PostgreSQL: `5436`
 - Redis: `6396`
-- MinIO API: `9002`
+- MinIO API: `9003`
 - MinIO Console: `9004`
 
 ---
@@ -836,7 +836,7 @@ Browser
   -> Backend  :9008
   -> PostgreSQL :5436
   -> Redis    :6396
-  -> MinIO    :9002 / :9004
+  -> MinIO    :9003 / :9004
 ```
 
 ### 16.3 常见排查
