@@ -120,16 +120,6 @@ PROFILE_COLLECTION = "conversation_profiles"
 SYSTEM_SETTINGS_COLLECTION = "system_settings"
 WELCOME_MESSAGE_KEY = "chat_welcome_message"
 DEFAULT_WELCOME_SCOPE = "default_school"
-MANUAL_CALLBACK_PROMPTS = {
-    "zh-CN": "请问您在哪个工作日时间方便，我们会电话回访，请注意接听2226开头的座机来电～",
-    "en": "What weekday time works best for you? We will call you back, so please watch for a landline call beginning with 2226.",
-    "zh-TW": "請問您在哪個工作日時間方便？我們會電話回訪，請留意接聽2226開頭的座機來電～",
-    "ja": "平日のどのお時間がご都合よろしいでしょうか。こちらからお電話でご連絡しますので、2226で始まる固定電話からの着信にご注意ください。",
-    "ko": "평일 중 언제 통화가 편하신가요? 저희가 전화로 다시 연락드릴 예정이니 2226으로 시작하는 유선전화 수신에 유의해 주세요.",
-    "fr": "Quel créneau en semaine vous conviendrait le mieux ? Nous vous rappellerons par téléphone. Merci de prêter attention aux appels d’un numéro fixe commençant par 2226.",
-    "es": "¿Qué horario entre semana le resulta más conveniente? Le devolveremos la llamada, por favor esté atento a las llamadas de un teléfono fijo que comience por 2226.",
-    "ru": "В какое время в будний день вам будет удобно? Мы свяжемся с вами по телефону, пожалуйста, обратите внимание на звонок со стационарного номера, начинающегося на 2226.",
-}
 INVALID_CONTACT_PROMPTS = {
     "zh-CN": {
         "phone": "您提供的手机号格式似乎不太正确，麻烦您重新发送 11 位手机号，我再继续帮您安排。",
@@ -492,16 +482,6 @@ def _default_welcome_message_for(language: str | None) -> str:
     if language.startswith("zh"):
         return DEFAULT_WELCOME_MESSAGES["zh-CN"]
     return DEFAULT_WELCOME_MESSAGES["en"]
-
-
-def _manual_callback_prompt_for(language: str | None) -> str:
-    if not language:
-        return MANUAL_CALLBACK_PROMPTS["zh-CN"]
-    if language in MANUAL_CALLBACK_PROMPTS:
-        return MANUAL_CALLBACK_PROMPTS[language]
-    if language.startswith("zh"):
-        return MANUAL_CALLBACK_PROMPTS["zh-CN"]
-    return MANUAL_CALLBACK_PROMPTS["en"]
 
 
 def _invalid_contact_prompt_for(language: str | None, fields: set[str]) -> str:
@@ -1198,22 +1178,6 @@ async def _postprocess_parent_reply(
                     merged_info["campus"] = appointment_doc["campus"]
                 info_complete = _has_complete_profile(merged_info)
 
-        manual_prompt_inserted = False
-        if needs_manual_callback_flag and not profile_flags.get(MANUAL_PROMPT_SENT_FLAG):
-            profile_flags[MANUAL_PROMPT_SENT_FLAG] = True
-            manual_message = MessageSchema(
-                conversation_id=conversation.id,
-                sender_type="bot",
-                content=_manual_callback_prompt_for(locale),
-                metadata={
-                    "system_tag": "manual_callback_prompt",
-                    "assistant_id": conversation.assistant_id,
-                } if conversation.assistant_id else {"system_tag": "manual_callback_prompt"},
-            )
-            manual_result = await db.messages.insert_one(manual_message.model_dump())
-            manual_message.id = str(manual_result.inserted_id)
-            manual_prompt_inserted = True
-
         phone_value = merged_info.get("phone")
 
         current_time = datetime.utcnow()
@@ -1401,8 +1365,6 @@ async def _postprocess_parent_reply(
         ):
             logger.info("会话 %s 家长画像已完整，可推进开放日转化", conversation.id)
 
-        if manual_prompt_inserted:
-            logger.info("会话 %s 已补发人工回访提示消息", conversation.id)
     except Exception as exc:
         logger.error("会话 %s 后处理失败: %s", conversation_id, exc, exc_info=True)
 
@@ -2160,32 +2122,9 @@ async def send_message(
                 quick_transcript = _build_transcript_from_history(history, request.content, parsed_answer)
                 quick_profile_info = _fallback_extract_info(dict(profile_info), quick_transcript)
                 quick_profile_info, _ = _sanitize_contact_fields(quick_profile_info)
-                quick_manual_prompt_payload = None
-
                 if manual_callback_triggered or _needs_manual_callback(quick_profile_info):
                     profile_flags[MANUAL_CALLBACK_FLAG] = True
-                    if not profile_flags.get(MANUAL_PROMPT_SENT_FLAG):
-                        profile_flags[MANUAL_PROMPT_SENT_FLAG] = True
-                        localized_manual_prompt = _manual_callback_prompt_for(request.language)
-                        manual_message = MessageSchema(
-                            conversation_id=conversation.id,
-                            sender_type="bot",
-                            content=localized_manual_prompt,
-                            metadata={
-                                "system_tag": "manual_callback_prompt",
-                                "assistant_id": effective_assistant_id,
-                            } if effective_assistant_id else {"system_tag": "manual_callback_prompt"},
-                        )
-                        manual_result = await db.messages.insert_one(manual_message.model_dump())
-                        manual_message.id = str(manual_result.inserted_id)
-                        quick_manual_prompt_payload = {
-                            "id": manual_message.id,
-                            "content": localized_manual_prompt,
-                        }
-
                 bot_message_count_delta = 1
-                if quick_manual_prompt_payload:
-                    bot_message_count_delta += 1
                 current_time = datetime.utcnow()
                 await db.conversations.update_one(
                     {"_id": conv_id},
@@ -2197,10 +2136,6 @@ async def send_message(
                         }
                     },
                 )
-
-                if quick_manual_prompt_payload:
-                    await _save_conversation_profile(db, conv_id, quick_profile_info, profile_flags)
-                    yield f"data: {json.dumps({'event': 'manual_prompt', 'bot_message': quick_manual_prompt_payload})}\n\n"
 
                 yield f"data: {json.dumps({'event': 'done', 'bot_message': {'id': str(bot_message.id), 'content': parsed_answer}})}\n\n"
 
