@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     FRONTEND_PULL_POLICY: str = "always"
     BACKEND_HOST_PORT: int = 9008
     FRONTEND_HOST_PORT: int = 8006
-    MINIO_API_PORT: int = 9002
+    MINIO_API_PORT: int = 9003
     MINIO_CONSOLE_PORT: int = 9004
 
     # ========== LLM 配置 ==========

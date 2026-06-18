@@ -19,6 +19,7 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 from app.core.config import settings
 from app.services.rag_chunking import build_parent_child_chunks
+from app.services.rag_chunking import ensure_parent_chunk_metadata
 from app.services.storage import StorageClient
 
 logger = logging.getLogger(__name__)
@@ -67,8 +68,12 @@ class DocIngestor:
         logger.info("Stored doc %s at %s", doc_id, storage_uri)
 
         # parse content
-        text = self._parse(ext, content)
-        chunks = self._chunk(text, meta)
+        if ext == ".xlsx":
+            rows = self._parse_xlsx_rows(content)
+            chunks = self._chunk_xlsx_rows(rows, meta)
+        else:
+            text = self._parse(ext, content)
+            chunks = self._chunk(text, meta)
 
         meta.status = "ready"
         meta.chunks = len(chunks)
@@ -182,22 +187,40 @@ class DocIngestor:
                 if slide_text:
                     slides.append(slide_text)
             return "\n".join(slides)
-        if ext == ".xlsx":
-            wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
-            texts = []
-            for sheet in wb:
-                rows = list(sheet.iter_rows(values_only=True))
-                if not rows:
-                    continue
-                headers = [str(h) if h is not None else "" for h in rows[0]]
-                for row in rows[1:]:
-                    pairs = [f"{h}:{v}" for h, v in zip(headers, row)]
-                    texts.append(" ".join(pairs))
-            return "\n".join(texts)
         if ext in {".jpg", ".jpeg", ".png"}:
             mime_type = "image/png" if ext == ".png" else "image/jpeg"
             return self._ocr_image(content, mime_type)
         return ""
+
+    def _parse_xlsx_rows(self, content: bytes) -> list[dict]:
+        wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+        items: list[dict] = []
+        for sheet in wb:
+            rows = list(sheet.iter_rows(values_only=True))
+            if not rows:
+                continue
+            headers = [str(h).strip() if h is not None else "" for h in rows[0]]
+            for row_index, row in enumerate(rows[1:], start=1):
+                pairs: list[str] = []
+                for header, value in zip(headers, row):
+                    if value is None:
+                        continue
+                    header_text = header.strip()
+                    value_text = str(value).strip()
+                    if not value_text:
+                        continue
+                    pairs.append(f"{header_text}:{value_text}" if header_text else value_text)
+                row_text = " ".join(pairs).strip()
+                if not row_text:
+                    continue
+                items.append(
+                    {
+                        "sheet_name": sheet.title,
+                        "row_index": row_index,
+                        "content": row_text,
+                    }
+                )
+        return items
 
     def _chunk(self, text: str, meta: DocMeta) -> list[dict]:
         if not text.strip():
@@ -222,6 +245,43 @@ class DocIngestor:
                     "section_index": 0,
                     "chunk_index": idx,
                     "content": d.get("content", ""),
+                    "metadata": metadata,
+                }
+            )
+        return chunks
+
+    def _chunk_xlsx_rows(self, rows: list[dict], meta: DocMeta) -> list[dict]:
+        if not rows:
+            return []
+
+        chunks: list[dict] = []
+        for idx, row in enumerate(rows):
+            row_content = str(row.get("content") or "").strip()
+            if not row_content:
+                continue
+
+            metadata = ensure_parent_chunk_metadata(
+                row_content,
+                {
+                    "doc_id": meta.doc_id,
+                    "doc_name": meta.name,
+                    "object_name": meta.object_name,
+                    "school_id": meta.school_id,
+                    "admin_id": meta.admin_id,
+                    "sheet_name": row.get("sheet_name"),
+                    "row_index": row.get("row_index"),
+                    "chunk_index": idx,
+                },
+                parent_seed=f"{meta.doc_id}-xlsx-row-{idx}",
+            )
+            chunks.append(
+                {
+                    "doc_id": meta.doc_id,
+                    "doc_name": meta.name,
+                    "object_name": meta.object_name,
+                    "section_index": 0,
+                    "chunk_index": idx,
+                    "content": row_content,
                     "metadata": metadata,
                 }
             )
