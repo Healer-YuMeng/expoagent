@@ -6,8 +6,8 @@
     - https://cnb.cool/fenyuanSaki/key/-/blob/main/env.prod.yml
   env:
     SERVER_DOCKER_REGISTRY: youwei.tencentcloudcr.com
-    SERVER_DOCKER_NAMESPACE: xt
-    BACKEND_IMAGE_NAME: xt-backend
+    SERVER_DOCKER_NAMESPACE: general_agent
+    BACKEND_IMAGE_NAME: general_agent-backend
   stages:
     - name: docker-login-build-push
       jobs:
@@ -31,8 +31,8 @@
     - https://cnb.cool/fenyuanSaki/key/-/blob/main/env.prod.yml
   env:
     SERVER_DOCKER_REGISTRY: youwei.tencentcloudcr.com
-    SERVER_DOCKER_NAMESPACE: xt
-    FRONTEND_IMAGE_NAME: xt-frontend
+    SERVER_DOCKER_NAMESPACE: general_agent
+    FRONTEND_IMAGE_NAME: general_agent-frontend
   stages:
     - name: docker-login-build-push
       jobs:

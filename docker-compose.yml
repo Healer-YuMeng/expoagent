@@ -1,10 +1,10 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: General_ageng_postgres
+    container_name: general_agent_postgres
     restart: always
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-General_ageng_admissions}
+      POSTGRES_DB: ${POSTGRES_DB:-general_agent_admissions}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
     volumes:
@@ -12,14 +12,14 @@ services:
     ports:
       - "${POSTGRES_HOST_PORT:-5436}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-General_ageng_admissions}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-general_agent_admissions}"]
       interval: 10s
       timeout: 5s
       retries: 10
 
   redis:
     image: redis:7-alpine
-    container_name: General_ageng_redis
+    container_name: general_agent_redis
     restart: always
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
@@ -34,7 +34,7 @@ services:
 
   minio:
     image: minio/minio:RELEASE.2025-02-18T16-25-55Z
-    container_name: General_ageng_minio
+    container_name: general_agent_minio
     restart: always
     environment:
       MINIO_ROOT_USER: ${RAG_MINIO_ACCESS_KEY:-minioadmin}
@@ -55,9 +55,9 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    image: ${SERVER_DOCKER_REGISTRY:-youwei.tencentcloudcr.com}/${SERVER_DOCKER_NAMESPACE:-General_ageng}/${BACKEND_IMAGE_NAME:-General_ageng-backend}:${BACKEND_IMAGE_TAG:-latest}
+    image: ${SERVER_DOCKER_REGISTRY:-youwei.tencentcloudcr.com}/${SERVER_DOCKER_NAMESPACE:-general_agent}/${BACKEND_IMAGE_NAME:-general_agent-backend}:${BACKEND_IMAGE_TAG:-latest}
     pull_policy: ${BACKEND_PULL_POLICY:-always}
-    container_name: General_ageng_backend
+    container_name: general_agent_backend
     restart: always
     depends_on:
       postgres:
@@ -72,7 +72,7 @@ services:
       BACKEND_HOST: 0.0.0.0
       BACKEND_PORT: 9008
       POSTGRES_SSL: "False"
-      POSTGRES_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password123}@postgres:5432/${POSTGRES_DB:-General_ageng_admissions}
+      POSTGRES_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password123}@postgres:5432/${POSTGRES_DB:-general_agent_admissions}
       RAG_REDIS_URL: redis://redis:6379/0
       RAG_MINIO_ENDPOINT: minio:9000
       RAG_MINIO_SECURE: "False"
@@ -89,9 +89,9 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         tiao: ${tiao}
-    image: ${SERVER_DOCKER_REGISTRY:-youwei.tencentcloudcr.com}/${SERVER_DOCKER_NAMESPACE:-General_ageng}/${FRONTEND_IMAGE_NAME:-General_ageng-frontend}:${FRONTEND_IMAGE_TAG:-latest}
+    image: ${SERVER_DOCKER_REGISTRY:-youwei.tencentcloudcr.com}/${SERVER_DOCKER_NAMESPACE:-general_agent}/${FRONTEND_IMAGE_NAME:-general_agent-frontend}:${FRONTEND_IMAGE_TAG:-latest}
     pull_policy: ${FRONTEND_PULL_POLICY:-always}
-    container_name: General_ageng_frontend
+    container_name: general_agent_frontend
     restart: always
     depends_on:
       - backend

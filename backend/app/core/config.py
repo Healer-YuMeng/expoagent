@@ -43,24 +43,24 @@ class Settings(BaseSettings):
     
     # ========== 数据库配置 ==========
     # PostgreSQL 连接字符串
-    # 开发环境示例: postgresql://postgres:password123@localhost:5436/General_ageng_admissions
+    # 开发环境示例: postgresql://postgres:password123@localhost:5436/general_agent_admissions
     # ⚠️ 生产环境必须通过环境变量设置，不要使用默认值
     POSTGRES_HOST_PORT: int = 5436
     POSTGRES_URL: str
     POSTGRES_SSL: bool = False
     
     # 数据库名称
-    POSTGRES_DB: str = "General_ageng_admissions"
+    POSTGRES_DB: str = "general_agent_admissions"
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "password123"
-    DB_NAME: str = "General_ageng_admissions"
+    DB_NAME: str = "general_agent_admissions"
 
     # ========== Docker / 部署配置 ==========
     SERVER_DOCKER_REGISTRY: str | None = None
-    SERVER_DOCKER_NAMESPACE: str = "General_ageng"
-    BACKEND_IMAGE_NAME: str = "General_ageng-backend"
+    SERVER_DOCKER_NAMESPACE: str = "general_agent"
+    BACKEND_IMAGE_NAME: str = "general_agent-backend"
     BACKEND_IMAGE_TAG: str = "latest"
-    FRONTEND_IMAGE_NAME: str = "General_ageng-frontend"
+    FRONTEND_IMAGE_NAME: str = "general_agent-frontend"
     FRONTEND_IMAGE_TAG: str = "latest"
     BACKEND_PULL_POLICY: str = "always"
     FRONTEND_PULL_POLICY: str = "always"
@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     # ========== 知识库配置 ==========
     KNOWLEDGE_BASE_DIR: str = "rag/data/knowledge_base"
     CHROMA_PERSIST_DIR: str = "rag/data/chroma/vector_store"
-    CHROMA_COLLECTION_NAME: str = "General_ageng_kb"
+    CHROMA_COLLECTION_NAME: str = "general_agent_kb"
     CHROMA_TOP_K: int = 4
     PARENT_CHUNK_SIZE: int = 1200
     PARENT_CHUNK_OVERLAP: int = 120

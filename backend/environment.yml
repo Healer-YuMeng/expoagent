@@ -1,4 +1,4 @@
-name: General_ageng
+name: general_agent
 channels:
   - defaults
   - https://repo.anaconda.com/pkgs/main
@@ -183,4 +183,4 @@ dependencies:
       - yarl==1.23.0
       - zipp==3.23.1
       - zstandard==0.25.0
-prefix: /opt/anaconda3/envs/General_ageng
+prefix: /opt/anaconda3/envs/general_agent

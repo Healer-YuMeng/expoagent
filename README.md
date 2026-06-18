@@ -7,7 +7,7 @@
 | minio api     | 9002 | MinIO API  |
 | minio console | 9004 | MinIO 控制台  |
 
-# General_ageng / YCIS 智能招生助手
+# general_agent / YCIS 智能招生助手
 
 > 单仓库说明文档。原先分散在 `docs/`、`backend/`、`frontend/`、`scripts/` 以及旧 `cfapi/` 目录下的 Markdown 文档内容已统一整理到本文件。
 
@@ -31,7 +31,7 @@
 ## 2. 当前目录结构
 
 ```text
-General_ageng/
+general_agent/
 ├── README.md
 ├── docker-compose.yml
 ├── .env
@@ -323,9 +323,9 @@ cp .env.example .env
 
 ```bash
 POSTGRES_HOST_PORT=5436
-POSTGRES_URL=postgresql://postgres:password123@localhost:5436/General_ageng_admissions
+POSTGRES_URL=postgresql://postgres:password123@localhost:5436/general_agent_admissions
 POSTGRES_SSL=False
-DB_NAME=General_ageng_admissions
+DB_NAME=general_agent_admissions
 
 LLM_PROVIDER=qwen
 LANGCHAIN_CHAT_MODEL=qwen-plus
@@ -340,7 +340,7 @@ OLLAMA_BASE_URL=http://localhost:11434
 EMBEDDING_PROVIDER=qwen
 EMBEDDING_MODEL=text-embedding-v4
 CHROMA_PERSIST_DIR=backend/data/chroma/vector_store
-CHROMA_COLLECTION_NAME=General_ageng_kb
+CHROMA_COLLECTION_NAME=general_agent_kb
 
 SECRET_KEY=replace-me
 ALGORITHM=HS256

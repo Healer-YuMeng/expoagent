@@ -114,7 +114,7 @@ def check_postgres_connection():
     
     try:
         result = subprocess.run(
-            ["docker", "ps", "--filter", "name=General_ageng_postgres", "--format", "{{.Status}}"],
+            ["docker", "ps", "--filter", "name=general_agent_postgres", "--format", "{{.Status}}"],
             capture_output=True,
             text=True
         )
