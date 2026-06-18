@@ -35,7 +35,7 @@ export function createConversation(payload?: { language?: string; source?: strin
  */
 export function getParentConversationMessages(
   conversationId: string,
-  params?: { page?: number; page_size?: number; language?: string; school_id?: string | null }
+  params?: { page?: number; page_size?: number; language?: string }
 ): Promise<{ items: Message[]; total: number }> {
   return request.get(`/v1/parent/conversations/${conversationId}/messages`, { params });
 }
@@ -43,18 +43,15 @@ export function getParentConversationMessages(
 export function getParentWelcomeMessage(
   conversationId: string,
   language: string,
-  schoolId?: string | null
 ): Promise<{ language: string; content: string }> {
   return request.get(`/v1/parent/conversations/${conversationId}/welcome-message`, {
     params: {
       language,
-      school_id: schoolId || undefined,
     },
   });
 }
 
 export function listParentAssistants(params?: {
-  school_id?: string | null;
   conversation_id?: string | null;
 }): Promise<{
   items: ParentAssistantItem[];
@@ -63,7 +60,6 @@ export function listParentAssistants(params?: {
 }> {
   return request.get('/v1/parent/assistants', {
     params: {
-      school_id: params?.school_id || undefined,
       conversation_id: params?.conversation_id || undefined,
     },
   });
@@ -86,7 +82,6 @@ export async function sendMessage(
   conversationId: string,
   content: string,
   language: string,
-  schoolId: string | null | undefined,
   assistantId: string | null | undefined,
   onChunk: (chunk: string) => void
 ) {
@@ -99,7 +94,7 @@ export async function sendMessage(
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token || ''}`,
     },
-    body: JSON.stringify({ content, language, school_id: schoolId || undefined, assistant_id: assistantId || undefined }),
+    body: JSON.stringify({ content, language, assistant_id: assistantId || undefined }),
     signal: controller.signal,
   });
 

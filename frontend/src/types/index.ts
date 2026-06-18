@@ -111,6 +111,7 @@ export interface Lead extends LeadListItem {
 
 export interface ManualCallbackItem {
   conversation_id: string;
+  lead_id?: string | null;
   reason: string;
   query: string;
   parent_name?: string | null;

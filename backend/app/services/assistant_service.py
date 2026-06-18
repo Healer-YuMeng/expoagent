@@ -37,10 +37,13 @@ class AssistantService:
             "updated_at": row.get("updated_at"),
         }
 
-    async def list_assistants(self, *, school_id: str) -> list[dict[str, Any]]:
+    async def list_assistants(self, *, school_id: str | None = None) -> list[dict[str, Any]]:
         await self._ensure_collection()
         items: list[dict[str, Any]] = []
-        cursor = self.db[ASSISTANT_COLLECTION].find({"school_id": school_id}).sort("created_at", 1)
+        query: dict[str, Any] = {}
+        if school_id:
+            query["school_id"] = school_id
+        cursor = self.db[ASSISTANT_COLLECTION].find(query).sort("created_at", 1)
         async for row in cursor:
             items.append(self._row_to_assistant(row))
         return items

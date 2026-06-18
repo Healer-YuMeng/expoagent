@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { getLead, addFollowUpNote, updateFollowUpNote, deleteFollowUpNote } from '@/api/lead';
-import { getTeacherConversationMessages } from '@/api/teacher';
+import { getTeacherConversationMessages, sendTeacherConversationMessage, updateTeacherConversationAiReply } from '@/api/teacher';
 import type { Lead, AddFollowUpNoteRequest } from '@/types';
 import type { Message } from '@/types/message'; // Assuming this exists
 
@@ -11,6 +11,7 @@ export const useLeadDetailStore = defineStore('leadDetail', () => {
   const loading = ref(false);
   const error = ref<string | null>(null);
   const currentLanguage = ref<string | undefined>(undefined);
+  const aiReplyEnabled = ref(true);
 
   async function fetchLead(id: string, language?: string) {
     currentLanguage.value = language;
@@ -34,6 +35,7 @@ export const useLeadDetailStore = defineStore('leadDetail', () => {
       // Assuming getConversationMessages is adapted for admin/teacher use
       const response = await getTeacherConversationMessages(conversationId, { page: 1, page_size: 200 });
       messages.value = response.items;
+      aiReplyEnabled.value = response.ai_reply_enabled !== false;
     } catch (e) {
       error.value = '无法加载对话记录';
       console.error(e);
@@ -72,14 +74,29 @@ export const useLeadDetailStore = defineStore('leadDetail', () => {
     }
   }
 
+  async function sendManualReply(conversationId: string, content: string) {
+    const message = await sendTeacherConversationMessage(conversationId, { content });
+    messages.value.push(message);
+    return message;
+  }
+
+  async function setAiReplyEnabled(conversationId: string, enabled: boolean) {
+    const response = await updateTeacherConversationAiReply(conversationId, enabled);
+    aiReplyEnabled.value = response.ai_reply_enabled !== false;
+    return response;
+  }
+
   return {
     lead,
     messages,
     loading,
     error,
+    aiReplyEnabled,
     fetchLead,
     addNote,
     updateNote,
     removeNote,
+    sendManualReply,
+    setAiReplyEnabled,
   };
 });

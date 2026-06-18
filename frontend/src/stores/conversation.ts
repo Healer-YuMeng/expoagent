@@ -59,14 +59,12 @@ export const useConversationStore = defineStore('conversation', () => {
   async function fetchMessages(conversationId: string) {
     loadingMessages.value = true;
     const selectedLanguage = getAppStorageItem('selectedLanguage') || 'zh-CN';
-    const schoolId = getAppStorageItem('selectedSchoolId') || '';
     try {
       await ensureParentSession();
       const response = await getParentConversationMessages(conversationId, {
         page: 1,
         page_size: 200,
         language: selectedLanguage,
-        school_id: schoolId || undefined,
       });
       currentMessages.value = response.items;
       persistLastParentConversationId(conversationId);
@@ -78,7 +76,6 @@ export const useConversationStore = defineStore('conversation', () => {
             page: 1,
             page_size: 200,
             language: selectedLanguage,
-            school_id: schoolId || undefined,
           });
           currentMessages.value = response.items;
           persistLastParentConversationId(conversationId);
@@ -95,7 +92,7 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  async function createNewConversation(schoolId?: string | null) {
+  async function createNewConversation() {
     const createConversation = async () => {
       const selectedLanguage = getAppStorageItem('selectedLanguage') || 'zh-CN';
       const source = getPersistedChannelSource();
@@ -103,7 +100,6 @@ export const useConversationStore = defineStore('conversation', () => {
       const newConversation = await createConversationApi({
         language: selectedLanguage,
         source,
-        school_id: schoolId || undefined,
         assistant_id: assistantId || undefined,
       });
       conversations.value.unshift(newConversation);
@@ -126,7 +122,6 @@ export const useConversationStore = defineStore('conversation', () => {
 
   async function postMessage(conversationId: string, content: string) {
     const selectedLanguage = getAppStorageItem('selectedLanguage') || 'zh-CN';
-    const schoolId = getAppStorageItem('selectedSchoolId') || '';
     const assistantId = getAppStorageItem('selectedAssistantId') || '';
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -148,7 +143,7 @@ export const useConversationStore = defineStore('conversation', () => {
 
     const streamMessage = async () => {
       await ensureParentSession();
-      await sendMessageApi(conversationId, content, selectedLanguage, schoolId || undefined, assistantId || undefined, (chunk: string) => {
+      await sendMessageApi(conversationId, content, selectedLanguage, assistantId || undefined, (chunk: string) => {
         try {
           const data = JSON.parse(chunk);
           if (data.answer) {
@@ -168,6 +163,10 @@ export const useConversationStore = defineStore('conversation', () => {
           if (data.event === 'done' && data.bot_message) {
             botMessage.id = data.bot_message.id ?? botMessage.id;
             botMessage.content = data.bot_message.content ?? botMessage.content;
+            currentMessages.value = [...currentMessages.value];
+          }
+          if (data.event === 'ai_disabled') {
+            currentMessages.value = currentMessages.value.filter((message) => message.id !== botMessage.id);
             currentMessages.value = [...currentMessages.value];
           }
           if (data.error) {

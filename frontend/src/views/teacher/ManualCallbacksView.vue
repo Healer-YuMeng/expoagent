@@ -31,12 +31,12 @@
           <div class="callback-content">
             <div class="callback-icon">🔔</div>
             <div class="callback-info">
-              <div class="reason-text">{{ callback.reason }}</div>
+              <div class="parent-text">{{ callback.parent_name || '未提供姓名' }}</div>
               <div class="query-text">{{ callback.query }}</div>
             </div>
           </div>
           <div class="action-buttons">
-            <button class="action-btn view-btn" @click="viewConversation(callback.conversation_id)">
+            <button class="action-btn view-btn" @click="viewCallback(callback)">
               {{ t('teacher.reminders.view') }}
             </button>
             <button class="action-btn delete-btn" @click="handleDelete(callback.conversation_id)">
@@ -77,8 +77,13 @@ async function fetchCallbacks() {
   loading.value = false;
 }
 
-function viewConversation(id: string) {
-  router.push({ name: 'TeacherConversation', params: { id } });
+function viewCallback(callback: ManualCallbackItem) {
+  if (callback.lead_id) {
+    router.push({ name: 'LeadDetail', params: { id: callback.lead_id } });
+    return;
+  }
+
+  router.push({ name: 'TeacherConversation', params: { id: callback.conversation_id } });
 }
 
 async function handleDelete(conversationId: string) {
@@ -230,12 +235,11 @@ onMounted(() => {
   flex: 1;
 }
 
-.reason-text {
-  font-size: 16px;
-  font-weight: 600;
-  color: #2c3e50;
-  margin-bottom: 8px;
-  line-height: 1.5;
+.parent-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2f49;
+  margin-bottom: 6px;
 }
 
 .query-text {
@@ -336,10 +340,6 @@ onMounted(() => {
 
   .callback-icon {
     font-size: 28px;
-  }
-
-  .reason-text {
-    font-size: 15px;
   }
 
   .query-text {

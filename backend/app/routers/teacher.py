@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from bson import ObjectId
 
 from app.db import PostgresCompatDatabase, get_database
+from app.models.message import MessageSchema
 from app.models.user import UserSchema
 # We will create this dependency next
 from app.core.dependencies import get_current_teacher 
@@ -65,6 +66,7 @@ class TranslateWelcomeMessageResponse(BaseModel):
 
 class ManualCallbackItem(BaseModel):
     conversation_id: str
+    lead_id: str | None = None
     reason: str
     query: str
     parent_name: str | None = None
@@ -89,6 +91,15 @@ class ConversationMessage(BaseModel):
 class ConversationMessagesResponse(BaseModel):
     total: int
     items: List[ConversationMessage]
+    ai_reply_enabled: bool = True
+
+
+class TeacherReplyRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=5000, description="老师人工回复内容")
+
+
+class TeacherAiReplyToggleRequest(BaseModel):
+    enabled: bool = Field(..., description="是否开启 AI 自动回复")
 
 
 def _normalize_welcome_messages(value: Any) -> dict[str, str]:
@@ -362,10 +373,22 @@ async def get_manual_callbacks(
         .sort("updated_at", -1)
     )
     items: list[ManualCallbackItem] = []
+    lead_id_cache: dict[str, str | None] = {}
     async for doc in cursor:
+        conversation_id = str(doc.get("conversation_id"))
+        lead_id = lead_id_cache.get(conversation_id)
+        if conversation_id not in lead_id_cache:
+            lead = await db.leads.find_one(
+                build_lead_chat_lookup(conversation_id),
+                {"_id": 1},
+            )
+            raw_lead_id = lead.get("_id") if lead else None
+            lead_id = str(raw_lead_id) if raw_lead_id is not None else None
+            lead_id_cache[conversation_id] = lead_id
         items.append(
             ManualCallbackItem(
-                conversation_id=str(doc.get("conversation_id")),
+                conversation_id=conversation_id,
+                lead_id=lead_id,
                 reason=doc.get("reason", ""),
                 query=doc.get("query", ""),
                 parent_name=doc.get("parent_name"),
@@ -484,6 +507,100 @@ async def get_conversation_messages(
     skip = (page - 1) * page_size
     items = visible_messages[skip:skip + page_size]
 
-    return ConversationMessagesResponse(total=total, items=items)
+    return ConversationMessagesResponse(
+        total=total,
+        items=items,
+        ai_reply_enabled=bool(conversation.get("ai_reply_enabled", True)),
+    )
+
+
+@router.patch(
+    "/conversations/{conversation_id}/ai-reply",
+    summary="切换会话 AI 自动回复",
+)
+async def update_conversation_ai_reply(
+    conversation_id: str,
+    request: TeacherAiReplyToggleRequest,
+    current_user: UserSchema = Depends(get_current_teacher),
+    db: PostgresCompatDatabase = Depends(get_database),
+):
+    candidates: list = [conversation_id]
+    if ObjectId.is_valid(conversation_id):
+        candidates.append(ObjectId(conversation_id))
+
+    conversation = await db.conversations.find_one({"_id": {"$in": candidates}})
+    if not conversation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="会话不存在")
+
+    await db.conversations.update_one(
+        {"_id": conversation["_id"]},
+        {"$set": {"ai_reply_enabled": bool(request.enabled), "updated_at": datetime.utcnow()}},
+    )
+    logger.info(
+        "Teacher %s set ai_reply_enabled=%s for conversation %s",
+        current_user.id,
+        request.enabled,
+        conversation_id,
+    )
+    return {"conversation_id": conversation_id, "ai_reply_enabled": bool(request.enabled)}
+
+
+@router.post(
+    "/conversations/{conversation_id}/messages",
+    response_model=ConversationMessage,
+    summary="老师人工回复会话消息",
+)
+async def send_teacher_message(
+    conversation_id: str,
+    request: TeacherReplyRequest,
+    current_user: UserSchema = Depends(get_current_teacher),
+    db: PostgresCompatDatabase = Depends(get_database),
+) -> ConversationMessage:
+    content = request.content.strip()
+    if not content:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="content 不能为空")
+
+    candidates: list = [conversation_id]
+    if ObjectId.is_valid(conversation_id):
+        candidates.append(ObjectId(conversation_id))
+
+    conversation = await db.conversations.find_one({"_id": {"$in": candidates}})
+    if not conversation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="会话不存在")
+
+    message = MessageSchema(
+        conversation_id=conversation_id,
+        sender_id=current_user.id,
+        sender_type="teacher",
+        sender_name=current_user.name or current_user.phone,
+        content=content,
+    )
+    result = await db.messages.insert_one(message.model_dump())
+    message.id = str(result.inserted_id)
+
+    now = message.created_at
+    message_count = await db.messages.count_documents({"conversation_id": {"$in": candidates}})
+    await db.conversations.update_one(
+        {"_id": conversation["_id"]},
+        {
+            "$set": {
+                "message_count": message_count,
+                "last_message_at": now,
+                "updated_at": now,
+            }
+        },
+    )
+
+    logger.info("Teacher %s replied conversation %s", current_user.id, conversation_id)
+    return ConversationMessage(
+        id=message.id,
+        conversation_id=conversation_id,
+        sender_type=message.sender_type,
+        sender_name=message.sender_name,
+        content=message.content,
+        created_at=message.created_at,
+    )
+
+
 def _welcome_key(school_id: str | None) -> str:
     return f"{WELCOME_MESSAGE_KEY}:{school_id or 'global'}"

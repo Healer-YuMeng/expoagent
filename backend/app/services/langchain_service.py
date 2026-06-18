@@ -611,6 +611,35 @@ class LangchainService:
         )
 
     @staticmethod
+    def _assistant_scope_refusal(locale: Optional[str], *, missing_binding: bool = False) -> str:
+        messages = {
+            "zh-CN": {
+                "missing_binding": "当前助手尚未绑定知识库，暂时无法回答该问题，请先在后台为该助手配置知识库。",
+                "out_of_scope": "当前问题不在该助手已绑定的知识库范围内，暂时无法回答，请切换到对应助手或补充该助手知识库内容。",
+            },
+            "zh-TW": {
+                "missing_binding": "目前助手尚未綁定知識庫，暫時無法回答此問題，請先在後台為該助手配置知識庫。",
+                "out_of_scope": "目前問題不在此助手已綁定的知識庫範圍內，暫時無法回答，請切換到對應助手或補充此助手知識庫內容。",
+            },
+            "en": {
+                "missing_binding": "This assistant has no knowledge base bound yet, so I cannot answer this question right now. Please configure a knowledge base for it first.",
+                "out_of_scope": "This question is outside the scope of this assistant's bound knowledge base, so I cannot answer it. Please switch to the matching assistant or add the content to this assistant's knowledge base.",
+            },
+        }
+        lang = locale if locale in messages else ("zh-CN" if locale and locale.startswith("zh") else "en")
+        key = "missing_binding" if missing_binding else "out_of_scope"
+        return messages[lang][key]
+
+    @staticmethod
+    def _assistant_scope_instruction() -> str:
+        return (
+            "当前会话已选择特定助手。"
+            "你只能依据该助手当前绑定知识库中明确提供的内容回答。"
+            "严禁引用其他助手知识库内容，严禁使用模型常识、历史记忆、推测或外部知识补充答案。"
+            "如果当前知识库资料不能直接支持答案，只能明确说明当前助手知识库未覆盖该问题，不得继续扩展回答。"
+        )
+
+    @staticmethod
     def _log_retrieval(query: str, documents: Sequence) -> None:
         if not logger.isEnabledFor(logging.INFO):
             return
@@ -665,6 +694,17 @@ class LangchainService:
             "本轮可临时放宽“50-100字”的长度限制，但仍需保持简洁、准确。"
         )
 
+    @classmethod
+    def _assistant_scoped_answer_instruction(cls, documents: Sequence) -> Optional[str]:
+        if not documents:
+            return None
+        return (
+            "系统判定：当前助手知识库已命中资料。"
+            "本轮回答只能使用当前命中的知识库内容。"
+            "不得补充当前片段中未明确出现的事实，不得引用其他助手知识库，不得使用常识脑补。"
+            "如果用户追问超出当前资料覆盖范围的细节，只能说明当前助手知识库未提供相关信息。"
+        )
+
     # ------------------------------------------------------------------
     # 对外能力
     # ------------------------------------------------------------------
@@ -714,8 +754,27 @@ class LangchainService:
             f"{self._runtime_time_guard_instruction(current_date)}\n\n"
             f"{self._reply_language_instruction(locale)}"
         )
+        if assistant_id:
+            system_prompt = f"{system_prompt}\n\n{self._assistant_scope_instruction()}"
+
+        if assistant_id and not knowledge_base_id:
+            refusal = self._assistant_scope_refusal(locale, missing_binding=True)
+            logger.info("[ChatAnswer] assistant=%s missing knowledge base binding", assistant_id)
+            yield refusal
+            return
+
+        if assistant_id and knowledge_base_id and not (docs or []):
+            refusal = self._assistant_scope_refusal(locale, missing_binding=False)
+            logger.info("[ChatAnswer] assistant=%s knowledge base miss for query=%s", assistant_id, query)
+            yield refusal
+            return
+
         effective_runtime_instructions: list[str] = []
-        retrieval_instruction = self._retrieval_answer_instruction(query, docs or [])
+        retrieval_instruction = (
+            self._assistant_scoped_answer_instruction(docs or [])
+            if assistant_id
+            else self._retrieval_answer_instruction(query, docs or [])
+        )
         if retrieval_instruction:
             effective_runtime_instructions.append(retrieval_instruction)
         if runtime_instructions:

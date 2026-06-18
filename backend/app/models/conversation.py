@@ -31,6 +31,7 @@ class ConversationSchema(BaseModel):
     parent_id: str = Field(..., description="家长用户ID")
     school_id: Optional[str] = Field(default=None, description="所属学校")
     assistant_id: Optional[str] = Field(default=None, description="所属助手")
+    ai_reply_enabled: bool = Field(default=True, description="是否开启 AI 自动回复")
     appointment: Optional[AppointmentInfo] = Field(default=None, description="预约信息")
     source_channel: Optional[str] = Field(default=None, description="渠道来源缩写")
     channel_appointment_logged: bool = Field(default=False, description="是否已记录渠道预约")
@@ -83,6 +84,7 @@ class ConversationResponse(BaseModel):
     parent_id: str
     school_id: Optional[str] = None
     assistant_id: Optional[str] = None
+    ai_reply_enabled: bool = True
     message_count: int = 0
     created_at: datetime
     updated_at: datetime

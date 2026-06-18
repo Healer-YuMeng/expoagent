@@ -67,8 +67,22 @@ export function deleteManualCallback(conversationId: string): Promise<{ message:
 export function getTeacherConversationMessages(
   conversationId: string,
   params?: { page?: number; page_size?: number }
-): Promise<{ items: Message[]; total: number }> {
+): Promise<{ items: Message[]; total: number; ai_reply_enabled: boolean }> {
   return request.get(`/v1/teacher/conversations/${conversationId}/messages`, { params });
+}
+
+export function sendTeacherConversationMessage(
+  conversationId: string,
+  data: { content: string },
+): Promise<Message> {
+  return request.post(`/v1/teacher/conversations/${conversationId}/messages`, data);
+}
+
+export function updateTeacherConversationAiReply(
+  conversationId: string,
+  enabled: boolean,
+): Promise<{ conversation_id: string; ai_reply_enabled: boolean }> {
+  return request.patch(`/v1/teacher/conversations/${conversationId}/ai-reply`, { enabled });
 }
 
 // --------- 系统提示词 ---------

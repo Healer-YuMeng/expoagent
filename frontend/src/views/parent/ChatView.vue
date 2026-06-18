@@ -111,17 +111,19 @@
               <span class="assistant-label">当前助手</span>
               <span class="assistant-tip">仅使用该助手绑定的知识库和提示词回答</span>
             </div>
-            <select
-              v-model="selectedAssistantId"
-              class="assistant-select"
-              :disabled="isSending || isSwitchingAssistant"
-              @change="handleAssistantChange"
-            >
-              <option value="">请选择助手</option>
-              <option v-for="assistant in assistantOptions" :key="assistant.id" :value="assistant.id">
+            <div class="assistant-pills">
+              <button
+                v-for="assistant in assistantOptions"
+                :key="assistant.id"
+                type="button"
+                class="assistant-pill"
+                :class="{ active: selectedAssistantId === assistant.id }"
+                :disabled="isSending || isSwitchingAssistant"
+                @click="handleAssistantSelect(assistant.id)"
+              >
                 {{ assistant.name }}
-              </option>
-            </select>
+              </button>
+            </div>
           </div>
 
           <div class="composer-inner">
@@ -149,7 +151,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useConversationStore } from '@/stores/conversation';
@@ -192,6 +194,7 @@ const messagesContainerRef = ref<HTMLDivElement | null>(null);
 const localizedWelcomeMessage = ref('');
 const assistantOptions = ref<ParentAssistantItem[]>([]);
 const selectedAssistantId = ref('');
+let refreshTimer: number | null = null;
 
 const APPOINTMENT_PATTERN = /\[\[APPOINTMENT\]\](\{[^]*?\})(?!\s*\{)/;
 const WECHAT_QR_PATTERN = /\[\[WECHAT_QR\]\](\{[^]*?\})(?!\s*\{)/;
@@ -252,17 +255,10 @@ async function handleSendMessage() {
 
 async function loadAssistants() {
   try {
-    const routeSchoolId = typeof route.query.school_id === 'string' ? route.query.school_id : '';
-    const storedSchoolId = getAppStorageItem('selectedSchoolId') || '';
     const response = await listParentAssistants({
       conversation_id: conversationId,
-      school_id: routeSchoolId || storedSchoolId || undefined,
     });
     assistantOptions.value = response.items || [];
-
-    if (response.school_id) {
-      setAppStorageItem('selectedSchoolId', response.school_id);
-    }
 
     const routeAssistantId = typeof route.query.assistant_id === 'string' ? route.query.assistant_id : '';
     const storedAssistantId = getAppStorageItem('selectedAssistantId') || '';
@@ -289,18 +285,12 @@ async function handleAssistantChange() {
 
   isSwitchingAssistant.value = true;
   try {
-    const updatedConversation = await updateConversationAssistant(conversationId, selectedAssistantId.value);
+    await updateConversationAssistant(conversationId, selectedAssistantId.value);
     setAppStorageItem('selectedAssistantId', selectedAssistantId.value);
-
-    const schoolId = updatedConversation.school_id || getAppStorageItem('selectedSchoolId') || '';
-    if (schoolId) {
-      setAppStorageItem('selectedSchoolId', schoolId);
-    }
 
     await router.replace({
       query: {
         ...route.query,
-        ...(schoolId ? { school_id: schoolId } : {}),
         assistant_id: selectedAssistantId.value,
       },
     });
@@ -310,6 +300,14 @@ async function handleAssistantChange() {
   } finally {
     isSwitchingAssistant.value = false;
   }
+}
+
+async function handleAssistantSelect(assistantId: string) {
+  if (!assistantId) {
+    return;
+  }
+  selectedAssistantId.value = assistantId;
+  await handleAssistantChange();
 }
 
 function handleGoHome() {
@@ -364,16 +362,7 @@ function appointmentFields(info: AppointmentPayload | null) {
 
 async function refreshLocalizedWelcomeMessage() {
   try {
-    const routeSchoolId = typeof route.query.school_id === 'string' ? route.query.school_id : '';
-    const schoolId = routeSchoolId || getAppStorageItem('selectedSchoolId') || '';
-    if (schoolId) {
-      setAppStorageItem('selectedSchoolId', schoolId);
-    }
-    const response = await getParentWelcomeMessage(
-      conversationId,
-      locale.value,
-      schoolId || undefined,
-    );
+    const response = await getParentWelcomeMessage(conversationId, locale.value);
     localizedWelcomeMessage.value = response.content || '';
   } catch (error) {
     console.error('Failed to load localized welcome message:', error);
@@ -385,6 +374,18 @@ onMounted(() => {
   conversationStore.fetchMessages(conversationId);
   refreshLocalizedWelcomeMessage();
   loadAssistants();
+  refreshTimer = window.setInterval(() => {
+    if (!isSending.value) {
+      void conversationStore.fetchMessages(conversationId);
+    }
+  }, 3000);
+});
+
+onUnmounted(() => {
+  if (refreshTimer !== null) {
+    window.clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
 });
 
 watch(
@@ -710,14 +711,38 @@ watch(
 }
 
 .assistant-select {
-  min-width: 220px;
-  border: 1px solid rgba(232, 236, 243, 0.96);
+  display: none;
+}
+
+.assistant-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  max-width: 70%;
+}
+
+.assistant-pill {
+  border: 1px solid rgba(166, 181, 214, 0.75);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #26354e;
-  font-size: 14px;
   padding: 10px 16px;
-  outline: none;
+  background: rgba(255, 255, 255, 0.92);
+  color: #30425e;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  box-shadow: 0 8px 18px rgba(53, 64, 92, 0.08);
+}
+
+.assistant-pill:hover {
+  transform: translateY(-1px);
+}
+
+.assistant-pill.active {
+  background: linear-gradient(135deg, rgba(97, 135, 255, 0.18), rgba(255, 255, 255, 0.98));
+  border-color: rgba(91, 125, 248, 0.95);
+  color: #20385f;
 }
 
 .composer-inner {
@@ -850,9 +875,9 @@ watch(
     align-items: stretch;
   }
 
-  .assistant-select {
-    width: 100%;
-    min-width: 0;
+  .assistant-pills {
+    max-width: 100%;
+    justify-content: flex-start;
   }
 
   .composer-inner {

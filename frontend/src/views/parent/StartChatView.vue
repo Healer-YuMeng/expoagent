@@ -21,7 +21,6 @@ const router = useRouter();
 const route = useRoute();
 const conversationStore = useConversationStore();
 const { t } = useI18n();
-const schoolId = ref<string>('');
 const assistantId = ref<string>('');
 
 const processChannelSource = () => {
@@ -30,14 +29,13 @@ const processChannelSource = () => {
 
 const initConversation = async () => {
   try {
-    const conversation = await conversationStore.createNewConversation(schoolId.value);
+    const conversation = await conversationStore.createNewConversation();
     if (conversation?.id) {
       router.push({
         name: 'ParentChat',
         params: { id: conversation.id },
         query: {
           ...route.query,
-          ...(schoolId.value ? { school_id: schoolId.value } : {}),
           ...(assistantId.value ? { assistant_id: assistantId.value } : {}),
         },
       });
@@ -50,15 +48,10 @@ const initConversation = async () => {
 
 onMounted(() => {
   processChannelSource();
-  const fromQuery = typeof route.query.school_id === 'string' ? route.query.school_id : '';
   const assistantFromQuery = typeof route.query.assistant_id === 'string' ? route.query.assistant_id : '';
-  const stored = getAppStorageItem('selectedSchoolId') || '';
   const storedAssistantId = getAppStorageItem('selectedAssistantId') || '';
-  schoolId.value = fromQuery || stored;
   assistantId.value = assistantFromQuery || storedAssistantId;
-  if (schoolId.value) {
-    setAppStorageItem('selectedSchoolId', schoolId.value);
-  }
+  removeAppStorageItem('selectedSchoolId');
   if (assistantId.value) {
     setAppStorageItem('selectedAssistantId', assistantId.value);
   } else {

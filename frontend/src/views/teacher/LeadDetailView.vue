@@ -155,6 +155,15 @@
       <div class="conversation-section glass">
         <div class="card-header">
           <h3 class="card-title">💬 {{ t('leads.detail.conversationRecord') }}</h3>
+          <button
+            v-if="lead.conversation_id"
+            class="ai-toggle-btn"
+            :class="{ off: !aiReplyEnabled }"
+            :disabled="togglingAiReply"
+            @click="handleToggleAiReply"
+          >
+            {{ togglingAiReply ? '切换中...' : aiReplyEnabled ? 'AI回复已开启' : 'AI回复已关闭' }}
+          </button>
         </div>
         <div class="messages-container">
           <div 
@@ -191,6 +200,22 @@
           <div v-if="!messages.length" class="empty-messages">
             <div class="empty-icon">💬</div>
             <div class="empty-text">{{ t('conversation.noMessages') }}</div>
+          </div>
+        </div>
+        <div v-if="lead.conversation_id" class="manual-reply-card">
+          <h4 class="reply-title">人工回复家长</h4>
+          <textarea
+            v-model="manualReply"
+            class="reply-textarea"
+            rows="4"
+            placeholder="输入人工回复内容，发送后家长端可见"
+            :disabled="replying"
+          />
+          <div class="reply-actions">
+            <button class="submit-btn reply-btn" :disabled="replying || !manualReply.trim()" @click="handleSendManualReply">
+              <span class="btn-icon">📨</span>
+              <span>{{ replying ? '发送中...' : '发送给家长' }}</span>
+            </button>
           </div>
         </div>
 
@@ -242,11 +267,14 @@ import { formatChinaDateTime } from '@/utils/time';
 const route = useRoute();
 const { t, locale } = useI18n();
 const leadDetailStore = useLeadDetailStore();
-const { lead, messages, loading, error } = storeToRefs(leadDetailStore);
+const { lead, messages, loading, error, aiReplyEnabled } = storeToRefs(leadDetailStore);
 
 const leadId = route.params.id as string;
 const newNote = ref('');
 const deleting = ref(false);
+const manualReply = ref('');
+const replying = ref(false);
+const togglingAiReply = ref(false);
 const APPOINTMENT_PATTERN = /\[\[APPOINTMENT\]\](\{[^]*?\})(?!\s*\{)/;
 const APPOINTMENT_MARKER = /\[\[APPOINTMENT\]\]\{[^]*?\}(?!\s*\{)/g;
 
@@ -483,6 +511,47 @@ const handleDeleteNote = async (noteId: string | null | undefined) => {
     }
   } finally {
     deleting.value = false;
+  }
+};
+
+const handleSendManualReply = async () => {
+  const conversationId = lead.value?.conversation_id;
+  const content = manualReply.value.trim();
+  if (!conversationId) {
+    ElMessage.warning('当前线索没有关联会话');
+    return;
+  }
+  if (!content || replying.value) {
+    return;
+  }
+  try {
+    replying.value = true;
+    await leadDetailStore.sendManualReply(conversationId, content);
+    manualReply.value = '';
+    ElMessage.success('人工回复已发送，家长端可见');
+  } catch (e: any) {
+    console.error(e);
+    ElMessage.error(e?.response?.data?.detail || '发送人工回复失败');
+  } finally {
+    replying.value = false;
+  }
+};
+
+const handleToggleAiReply = async () => {
+  const conversationId = lead.value?.conversation_id;
+  if (!conversationId || togglingAiReply.value) {
+    return;
+  }
+  try {
+    togglingAiReply.value = true;
+    const nextEnabled = !aiReplyEnabled.value;
+    await leadDetailStore.setAiReplyEnabled(conversationId, nextEnabled);
+    ElMessage.success(nextEnabled ? '已开启 AI 回复' : '已关闭 AI 回复');
+  } catch (e: any) {
+    console.error(e);
+    ElMessage.error(e?.response?.data?.detail || '切换 AI 回复失败');
+  } finally {
+    togglingAiReply.value = false;
   }
 };
 </script>
@@ -898,12 +967,87 @@ const handleDeleteNote = async (noteId: string | null | undefined) => {
   flex-direction: column;
 }
 
+.conversation-section .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ai-toggle-btn {
+  border: 1px solid rgba(56, 142, 60, 0.28);
+  background: rgba(56, 142, 60, 0.12);
+  color: #237a34;
+  border-radius: 999px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ai-toggle-btn.off {
+  border-color: rgba(198, 40, 40, 0.24);
+  background: rgba(198, 40, 40, 0.12);
+  color: #b42318;
+}
+
+.ai-toggle-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .messages-container {
   flex: 0 0 auto;
   max-height: 420px;
   overflow-y: auto;
   padding: 15px;
   margin-top: 15px;
+}
+
+.manual-reply-card {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.reply-title {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.reply-textarea {
+  width: 100%;
+  min-height: 110px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(180, 196, 220, 0.9);
+  background: rgba(255, 255, 255, 0.92);
+  color: #2c3e50;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.reply-textarea:focus {
+  outline: none;
+  border-color: rgba(76, 125, 255, 0.9);
+  box-shadow: 0 0 0 3px rgba(76, 125, 255, 0.12);
+}
+
+.reply-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.reply-btn {
+  min-width: 160px;
 }
 
 .messages-container::-webkit-scrollbar {

@@ -50,6 +50,7 @@ class ConversationDetailResponse(BaseModel):
     updated_at: datetime
     school_id: Optional[str] = None
     assistant_id: Optional[str] = None
+    ai_reply_enabled: bool = True
     appointment: Optional[dict] = None
 
 
@@ -376,18 +377,37 @@ def _contains_manual_keyword(text: Optional[str]) -> bool:
     return any(keyword.lower() in lowered for keyword in MANUAL_TRIGGER_KEYWORDS)
 
 
-def _find_manual_callback_reason(query: str, documents: Sequence) -> Optional[str]:
+def _latest_parent_history_message(history: Sequence[dict[str, Any]] | None) -> Optional[str]:
+    if not history:
+        return None
+    for item in reversed(history):
+        if (item.get("role") or "").lower() != "user":
+            continue
+        content = str(item.get("content") or "").strip()
+        if content:
+            return content
+    return None
+
+
+def _find_manual_callback_reason(
+    query: str,
+    documents: Sequence,
+    history: Sequence[dict[str, Any]] | None = None,
+) -> tuple[Optional[str], Optional[str]]:
     if _contains_manual_keyword(query):
-        return query.strip()
+        previous_query = _latest_parent_history_message(history) or query.strip()
+        return query.strip(), previous_query
     for doc in documents or []:
         metadata = getattr(doc, "metadata", {}) or {}
         question = metadata.get("question")
         content = getattr(doc, "page_content", "") or ""
         if _contains_manual_keyword(question):
-            return str(question).strip()
+            reason = str(question).strip()
+            return reason, reason
         if _contains_manual_keyword(content):
-            return str(question or content[:120]).strip()
-    return None
+            reason = str(question or content[:120]).strip()
+            return reason, reason
+    return None, None
 
 
 async def _maybe_record_manual_callback(
@@ -396,18 +416,26 @@ async def _maybe_record_manual_callback(
     parent: UserSchema,
     query: str,
     documents: Sequence,
+    history: Sequence[dict[str, Any]] | None = None,
+    profile_info: Optional[dict[str, Any]] = None,
 ) -> Optional[str]:
-    reason = _find_manual_callback_reason(query, documents)
+    reason, display_query = _find_manual_callback_reason(query, documents, history)
     if not reason:
         return None
     now = datetime.utcnow()
+    parent_name = (
+        _normalize_parent_name_candidate((profile_info or {}).get("parent_name"))
+        or _normalize_parent_name_candidate(parent.parent_name)
+        or _normalize_parent_name_candidate(parent.name)
+        or DEFAULT_PARENT_DISPLAY_NAME
+    )
     payload = {
         "conversation_id": conversation_id,
         "parent_id": parent.id,
-        "parent_name": parent.name,
+        "parent_name": parent_name,
         "parent_phone": parent.phone,
         "reason": reason,
-        "query": query,
+        "query": display_query or query,
         "updated_at": now,
     }
     await db[MANUAL_CALLBACK_COLLECTION].update_one(
@@ -701,6 +729,29 @@ async def _load_assistant(db: PostgresCompatDatabase, assistant_id: Optional[str
     if not assistant_id:
         return None
     return await AssistantService(db).get_assistant(assistant_id)
+
+
+async def _resolve_conversation_school_scope(
+    db: PostgresCompatDatabase,
+    *,
+    conversation: dict,
+    fallback_school_id: Optional[str] = None,
+) -> tuple[Optional[str], Optional[dict], bool]:
+    school_id = (conversation.get("school_id") or "").strip() or None
+    assistant_id = (conversation.get("assistant_id") or "").strip() or None
+    assistant = None
+    inferred_from_assistant = False
+
+    if assistant_id:
+        assistant = await _load_assistant(db, assistant_id)
+        if assistant and not school_id:
+            school_id = (assistant.get("school_id") or "").strip() or None
+            inferred_from_assistant = bool(school_id)
+
+    if not school_id:
+        school_id = (fallback_school_id or "").strip() or None
+
+    return school_id, assistant, inferred_from_assistant
 
 
 async def _load_conversation_profile(db: PostgresCompatDatabase, conv_id: ObjectId) -> dict:
@@ -1393,6 +1444,7 @@ async def create_conversation(
         "channel_appointment_logged": False,
         "school_id": effective_school_id,
         "assistant_id": assistant.get("id") if assistant else request_data.assistant_id,
+        "ai_reply_enabled": True,
     }
     if channel_source:
         conversation_data["source_channel"] = channel_source
@@ -1450,6 +1502,7 @@ async def create_conversation(
         updated_at=conversation.updated_at,
         school_id=conversation.school_id,
         assistant_id=conversation.assistant_id,
+        ai_reply_enabled=bool(getattr(conversation, "ai_reply_enabled", True)),
         appointment=conversation.appointment.model_dump() if conversation.appointment else None,
     )
 
@@ -1482,13 +1535,18 @@ async def get_conversation_welcome_message(
             detail="会话不存在",
         )
 
-    effective_school_id = conv_dict.get("school_id") or school_id
-    if school_id and not conv_dict.get("school_id"):
+    effective_school_id, _assistant, inferred_from_assistant = await _resolve_conversation_school_scope(
+        db,
+        conversation=conv_dict,
+        fallback_school_id=school_id,
+    )
+    if inferred_from_assistant or (school_id and not conv_dict.get("school_id")):
+        next_school_id = effective_school_id
         await db.conversations.update_one(
             {"_id": conv_id},
             {
                 "$set": {
-                    "school_id": school_id,
+                    "school_id": next_school_id,
                     "updated_at": datetime.utcnow(),
                 }
             },
@@ -1523,18 +1581,29 @@ async def list_parent_assistants(
         })
         if not conv_dict:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="会话不存在")
-        scope_school_id = conv_dict.get("school_id") or scope_school_id
+        scope_school_id, _assistant, inferred_from_assistant = await _resolve_conversation_school_scope(
+            db,
+            conversation=conv_dict,
+            fallback_school_id=scope_school_id,
+        )
+        if inferred_from_assistant and scope_school_id:
+            await db.conversations.update_one(
+                {"_id": conv_id},
+                {"$set": {"school_id": scope_school_id, "updated_at": datetime.utcnow()}},
+            )
         selected_assistant_id = (conv_dict.get("assistant_id") or "").strip() or None
 
-    if not scope_school_id:
-        return ParentAssistantListResponse(items=[], selected_assistant_id=selected_assistant_id, school_id=None)
-
-    assistants = await AssistantService(db).list_assistants(scope_school_id)
+    assistants = await AssistantService(db).list_assistants(school_id=scope_school_id)
     active_items = [item for item in assistants if item.get("is_active", True)]
+    inferred_school_id = scope_school_id
+    if not inferred_school_id:
+        school_ids = {str(item.get("school_id") or "").strip() for item in active_items if str(item.get("school_id") or "").strip()}
+        if len(school_ids) == 1:
+            inferred_school_id = next(iter(school_ids))
     return ParentAssistantListResponse(
         items=active_items,
         selected_assistant_id=selected_assistant_id,
-        school_id=scope_school_id,
+        school_id=inferred_school_id,
     )
 
 
@@ -1583,6 +1652,7 @@ async def get_conversation_detail(
         updated_at=conv_dict["updated_at"],
         school_id=conv_dict.get("school_id"),
         assistant_id=conv_dict.get("assistant_id"),
+        ai_reply_enabled=bool(conv_dict.get("ai_reply_enabled", True)),
         appointment=appointment_payload
     )
 
@@ -1648,6 +1718,7 @@ async def update_conversation_assistant(
         updated_at=refreshed["updated_at"],
         school_id=refreshed.get("school_id"),
         assistant_id=refreshed.get("assistant_id"),
+        ai_reply_enabled=bool(refreshed.get("ai_reply_enabled", True)),
         appointment=appointment_payload,
     )
 
@@ -1686,13 +1757,18 @@ async def get_conversation_messages(
             detail="会话不存在"
         )
 
-    effective_school_id = conv_dict.get("school_id") or school_id
-    if school_id and not conv_dict.get("school_id"):
+    effective_school_id, _assistant, inferred_from_assistant = await _resolve_conversation_school_scope(
+        db,
+        conversation=conv_dict,
+        fallback_school_id=school_id,
+    )
+    if inferred_from_assistant or (school_id and not conv_dict.get("school_id")):
+        next_school_id = effective_school_id
         await db.conversations.update_one(
             {"_id": conv_id},
             {
                 "$set": {
-                    "school_id": school_id,
+                    "school_id": next_school_id,
                     "updated_at": datetime.utcnow(),
                 }
             },
@@ -1784,6 +1860,7 @@ async def send_message(
 
     conversation_school_id = conv_dict.get("school_id")
     conversation_assistant_id = (conv_dict.get("assistant_id") or "").strip() or None
+    ai_reply_enabled = bool(conv_dict.get("ai_reply_enabled", True))
     request_assistant_id = (request.assistant_id or "").strip() or None
     effective_assistant_id = conversation_assistant_id or request_assistant_id
     assistant = await _load_assistant(db, effective_assistant_id)
@@ -1791,16 +1868,19 @@ async def send_message(
         raise HTTPException(status_code=404, detail="助手不存在")
     if request_assistant_id and not conv_dict.get("assistant_id"):
         updated_at = datetime.utcnow()
+        next_school_id = (assistant.get("school_id") if assistant else None) or conv_dict.get("school_id")
         await db.conversations.update_one(
             {"_id": conv_id},
             {
                 "$set": {
                     "assistant_id": request_assistant_id,
+                    "school_id": next_school_id,
                     "updated_at": updated_at,
                 }
             },
         )
         conv_dict["assistant_id"] = request_assistant_id
+        conv_dict["school_id"] = next_school_id
         conv_dict["updated_at"] = updated_at
         effective_assistant_id = request_assistant_id
         conversation_assistant_id = request_assistant_id
@@ -1906,6 +1986,14 @@ async def send_message(
         full_answer = ""  # 累积完整答案
         
         try:
+            latest_conversation = await db.conversations.find_one({"_id": conv_id}, {"ai_reply_enabled": 1})
+            latest_ai_reply_enabled = bool(
+                latest_conversation.get("ai_reply_enabled", ai_reply_enabled)
+            ) if latest_conversation else ai_reply_enabled
+            if not latest_ai_reply_enabled:
+                yield f"data: {json.dumps({'event': 'ai_disabled'})}\n\n"
+                return
+
             logger.debug("%s", "=" * 80)
             logger.debug("开始流式调用 LangChain 模型")
             logger.debug("query = %s", request.content)
@@ -1935,6 +2023,8 @@ async def send_message(
                 current_user,
                 request.content,
                 retrieved_docs,
+                history=history,
+                profile_info=profile_info,
             )
             if manual_reason:
                 manual_callback_triggered = True
