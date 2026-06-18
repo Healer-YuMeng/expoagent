@@ -192,10 +192,7 @@ def _compute_effective_ai_reply_enabled(
     conversation: dict[str, Any],
     lead: dict[str, Any] | None,
 ) -> bool:
-    conversation_enabled = bool(conversation.get("ai_reply_enabled", True))
-    if not lead or "ai_reply_enabled" not in lead:
-        return conversation_enabled
-    return conversation_enabled and bool(lead.get("ai_reply_enabled", True))
+    return bool(conversation.get("ai_reply_enabled", True))
 
 @router.get("/dashboard", summary="获取老师工作台摘要数据")
 async def get_teacher_dashboard(
@@ -555,37 +552,16 @@ async def update_conversation_ai_reply(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="会话不存在")
 
     now = datetime.utcnow()
-    resolved_conversation_id = str(conversation.get("_id"))
-    lead = await _get_lead_for_conversation(db, resolved_conversation_id)
-
-    conversation_filter: dict[str, Any] = {"_id": conversation["_id"]}
-    parent_id = conversation.get("parent_id")
-    scope_school_id = (
-        (lead.get("school_id") if lead else None)
-        or conversation.get("school_id")
-    )
-    if parent_id:
-        conversation_filter = {"parent_id": parent_id}
-        if scope_school_id:
-            conversation_filter["school_id"] = scope_school_id
-
-    await db.conversations.update_many(
-        conversation_filter,
+    await db.conversations.update_one(
+        {"_id": conversation["_id"]},
         {"$set": {"ai_reply_enabled": bool(request.enabled), "updated_at": now}},
     )
-    if lead:
-        await db.leads.update_one(
-            {"_id": lead["_id"]},
-            {"$set": {"ai_reply_enabled": bool(request.enabled), "updated_at": now}},
-        )
 
     logger.info(
-        "Teacher %s set ai_reply_enabled=%s for conversation %s scope=%s lead=%s",
+        "Teacher %s set ai_reply_enabled=%s for conversation %s",
         current_user.id,
         request.enabled,
         conversation_id,
-        conversation_filter,
-        str(lead.get("_id")) if lead else None,
     )
     return {"conversation_id": conversation_id, "ai_reply_enabled": bool(request.enabled)}
 

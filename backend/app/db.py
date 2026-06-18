@@ -435,6 +435,7 @@ COLLECTION_SCHEMAS: dict[str, CollectionSchema] = {
             _col("parent_id", "TEXT"),
             _col("school_id", "TEXT"),
             _col("assistant_id", "TEXT"),
+            _col("ai_reply_enabled", "BOOLEAN", default_sql="TRUE"),
             _json_col("appointment"),
             _col("source_channel", "TEXT"),
             _col("channel_appointment_logged", "BOOLEAN", default_sql="FALSE"),

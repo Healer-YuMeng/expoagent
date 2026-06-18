@@ -1460,15 +1460,6 @@ async def create_conversation(
     if assistant and not assistant.get("is_active", True):
         raise HTTPException(status_code=400, detail="助手未启用")
     effective_school_id = request_data.school_id or (assistant.get("school_id") if assistant else None)
-    existing_lead = await _find_lead_for_ai_reply_scope(
-        db=db,
-        conversation_id="",
-        parent_id=str(parent_id),
-        school_id=effective_school_id,
-    )
-    initial_ai_reply_enabled = True
-    if existing_lead and "ai_reply_enabled" in existing_lead:
-        initial_ai_reply_enabled = bool(existing_lead.get("ai_reply_enabled", True))
 
     conversation_data = {
         "parent_id": parent_object_id,
@@ -1480,7 +1471,7 @@ async def create_conversation(
         "channel_appointment_logged": False,
         "school_id": effective_school_id,
         "assistant_id": assistant.get("id") if assistant else request_data.assistant_id,
-        "ai_reply_enabled": initial_ai_reply_enabled,
+        "ai_reply_enabled": True,
     }
     if channel_source:
         conversation_data["source_channel"] = channel_source
@@ -1898,12 +1889,6 @@ async def send_message(
     conversation_school_id = conv_dict.get("school_id")
     conversation_assistant_id = (conv_dict.get("assistant_id") or "").strip() or None
     ai_reply_enabled = bool(conv_dict.get("ai_reply_enabled", True))
-    lead_ai_scope = await _find_lead_for_ai_reply_scope(
-        db=db,
-        conversation_id=conversation_id,
-        parent_id=str(current_user.id),
-        school_id=conversation_school_id,
-    )
     request_assistant_id = (request.assistant_id or "").strip() or None
     effective_assistant_id = conversation_assistant_id or request_assistant_id
     assistant = await _load_assistant(db, effective_assistant_id)
@@ -2035,10 +2020,6 @@ async def send_message(
             latest_ai_reply_enabled = bool(
                 latest_conversation.get("ai_reply_enabled", ai_reply_enabled)
             ) if latest_conversation else ai_reply_enabled
-            if lead_ai_scope and "ai_reply_enabled" in lead_ai_scope:
-                latest_ai_reply_enabled = latest_ai_reply_enabled and bool(
-                    lead_ai_scope.get("ai_reply_enabled", True)
-                )
             if not latest_ai_reply_enabled:
                 yield f"data: {json.dumps({'event': 'ai_disabled'})}\n\n"
                 return
