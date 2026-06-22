@@ -18,10 +18,10 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
-    port: 8006,
+    port: 8606,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:9008',
+        target: 'http://127.0.0.1:9608',
         changeOrigin: true,
       }
     }
