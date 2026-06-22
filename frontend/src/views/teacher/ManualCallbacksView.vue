@@ -79,7 +79,7 @@ async function fetchCallbacks() {
 
 function viewCallback(callback: ManualCallbackItem) {
   if (callback.lead_id) {
-    router.push({ name: 'LeadDetail', params: { id: callback.lead_id } });
+    router.push({ path: `/teacher/leads/${callback.lead_id}` });
     return;
   }
 

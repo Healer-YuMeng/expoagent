@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/teacher", tags=["老师端"])
 AI_REPLY_AUTO_RESUME_DELAY_SECONDS = 300
 _ai_reply_auto_resume_tasks: dict[str, asyncio.Task] = {}
+AUTO_LEAD_PREFIX = "auto_lead"
+AUTO_LEAD_SCOPE = "global"
 HIDDEN_TEACHER_MESSAGE_TAGS = {"manual_callback_prompt"}
 WELCOME_MESSAGE_TRANSLATION_TARGETS = {
     "en": "English",
@@ -242,6 +244,11 @@ def _compute_effective_ai_reply_enabled(
     lead: dict[str, Any] | None,
 ) -> bool:
     return bool(conversation.get("ai_reply_enabled", True))
+
+
+def _build_auto_lead_id(parent_id: str, school_id: str | None) -> str:
+    scope = (school_id or AUTO_LEAD_SCOPE).strip() or AUTO_LEAD_SCOPE
+    return f"{AUTO_LEAD_PREFIX}:{scope}:{parent_id}"
 
 
 def _normalize_utc_naive_datetime(value: datetime | None) -> datetime | None:
@@ -568,6 +575,18 @@ async def get_manual_callbacks(
                 build_lead_chat_lookup(conversation_id),
                 {"_id": 1},
             )
+            if not lead:
+                conversation = await db.conversations.find_one(
+                    {"_id": conversation_id},
+                    {"_id": 1, "parent_id": 1, "school_id": 1},
+                )
+                parent_id = str(conversation.get("parent_id") or "").strip() if conversation else ""
+                school_id = str(conversation.get("school_id") or "").strip() if conversation else ""
+                if parent_id:
+                    lead = await db.leads.find_one(
+                        {"_id": _build_auto_lead_id(parent_id, school_id or None)},
+                        {"_id": 1},
+                    )
             raw_lead_id = lead.get("_id") if lead else None
             lead_id = str(raw_lead_id) if raw_lead_id is not None else None
             lead_id_cache[conversation_id] = lead_id
