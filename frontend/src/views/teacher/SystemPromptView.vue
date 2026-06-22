@@ -60,12 +60,25 @@
         <label class="field grow">
           专属知识库
           <div class="inline-row">
-            <select v-model="selectedKnowledgeBaseId" :disabled="!selectedAssistantId || bindingKnowledgeBase">
-              <option value="">不绑定知识库</option>
-              <option v-for="kb in knowledgeBases" :key="kb.id" :value="kb.id">
-                {{ kb.name }} ({{ kb.doc_count || 0 }} 篇)
-              </option>
-            </select>
+            <el-select
+              v-model="selectedKnowledgeBaseIds"
+              class="knowledge-base-select"
+              multiple
+              filterable
+              clearable
+              collapse-tags
+              collapse-tags-tooltip
+              placeholder="请选择一个或多个知识库"
+              no-data-text="暂无知识库"
+              :disabled="!selectedAssistantId || bindingKnowledgeBase"
+            >
+              <el-option
+                v-for="kb in knowledgeBases"
+                :key="kb.id"
+                :label="`${kb.name} (${kb.doc_count || 0} 篇)`"
+                :value="kb.id"
+              />
+            </el-select>
             <button class="ghost" @click="handleBindKnowledgeBase" :disabled="!selectedAssistantId || bindingKnowledgeBase">
               <span v-if="bindingKnowledgeBase">保存中...</span>
               <span v-else>保存绑定</span>
@@ -76,7 +89,7 @@
 
       <div class="meta-row">
         <span>当前状态：{{ isDefault ? '默认模板' : '自定义生效' }}</span>
-        <span v-if="currentKnowledgeBaseName">当前知识库：{{ currentKnowledgeBaseName }}</span>
+        <span v-if="currentKnowledgeBaseNames">当前知识库：{{ currentKnowledgeBaseNames }}</span>
         <span v-if="version">版本：{{ version }}</span>
         <span v-if="updatedBy">更新人：{{ updatedBy }}</span>
         <span v-if="updatedAt">更新时间：{{ updatedAt }}</span>
@@ -142,7 +155,7 @@ const selectedAssistantId = ref('');
 const newAssistantName = ref('');
 
 const knowledgeBases = ref<KnowledgeBaseItem[]>([]);
-const selectedKnowledgeBaseId = ref('');
+const selectedKnowledgeBaseIds = ref<string[]>([]);
 
 const placeholder = '在此编辑该助手的系统提示词。建议写清楚角色、回答风格、知识库使用规则，以及只需采集 parent_name 和 phone。';
 
@@ -150,9 +163,13 @@ const selectedAssistant = computed(() => {
   return assistants.value.find((item) => item.id === selectedAssistantId.value) || null;
 });
 
-const currentKnowledgeBaseName = computed(() => {
-  if (!selectedKnowledgeBaseId.value) return '';
-  return knowledgeBases.value.find((item) => item.id === selectedKnowledgeBaseId.value)?.name || '';
+const currentKnowledgeBaseNames = computed(() => {
+  if (!selectedKnowledgeBaseIds.value.length) return '';
+  const selectedIds = new Set(selectedKnowledgeBaseIds.value);
+  return knowledgeBases.value
+    .filter((item) => selectedIds.has(item.id))
+    .map((item) => item.name)
+    .join('、');
 });
 
 const resetPromptState = () => {
@@ -213,7 +230,7 @@ const loadAssistants = async () => {
 const loadKnowledgeBases = async () => {
   if (!effectiveSchoolId.value) {
     knowledgeBases.value = [];
-    selectedKnowledgeBaseId.value = '';
+    selectedKnowledgeBaseIds.value = [];
     return;
   }
   try {
@@ -251,7 +268,7 @@ const handleBindKnowledgeBase = async () => {
   bindingKnowledgeBase.value = true;
   try {
     const updated = await updateAssistant(selectedAssistantId.value, {
-      knowledge_base_id: selectedKnowledgeBaseId.value || null,
+      knowledge_base_ids: selectedKnowledgeBaseIds.value,
     });
     assistants.value = assistants.value.map((item) => item.id === updated.id ? updated : item);
     ElMessage.success('知识库绑定已保存');
@@ -298,13 +315,19 @@ const resetToDefault = () => {
 watch(effectiveSchoolId, async () => {
   resetPromptState();
   selectedAssistantId.value = '';
-  selectedKnowledgeBaseId.value = '';
+  selectedKnowledgeBaseIds.value = [];
   await loadKnowledgeBases();
   await loadAssistants();
 });
 
 watch(selectedAssistant, async (assistant) => {
-  selectedKnowledgeBaseId.value = assistant?.knowledge_base_id || '';
+  if (assistant?.knowledge_base_ids?.length) {
+    selectedKnowledgeBaseIds.value = [...assistant.knowledge_base_ids];
+  } else if (assistant?.knowledge_base_id) {
+    selectedKnowledgeBaseIds.value = [assistant.knowledge_base_id];
+  } else {
+    selectedKnowledgeBaseIds.value = [];
+  }
   await loadPrompt();
 });
 
@@ -356,6 +379,10 @@ onMounted(() => {
 .subtitle {
   margin: 6px 0 0;
   color: rgba(44, 62, 80, 0.7);
+}
+
+.knowledge-base-select {
+  width: 100%;
 }
 
 .actions {
@@ -426,6 +453,10 @@ onMounted(() => {
 .inline-row input,
 .inline-row select,
 .meta-row select {
+  width: 100%;
+}
+
+.inline-row :deep(.el-select) {
   width: 100%;
 }
 

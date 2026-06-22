@@ -256,7 +256,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useLeadDetailStore } from '@/stores/leadDetail';
@@ -275,6 +275,7 @@ const deleting = ref(false);
 const manualReply = ref('');
 const replying = ref(false);
 const togglingAiReply = ref(false);
+let aiReplyStateRefreshTimer: number | null = null;
 const APPOINTMENT_PATTERN = /\[\[APPOINTMENT\]\](\{[^]*?\})(?!\s*\{)/;
 const APPOINTMENT_MARKER = /\[\[APPOINTMENT\]\]\{[^]*?\}(?!\s*\{)/g;
 
@@ -290,11 +291,41 @@ onMounted(async () => {
   await leadDetailStore.fetchLead(leadId, locale.value);
 });
 
+onUnmounted(() => {
+  leadDetailStore.stopMessagePolling();
+  if (aiReplyStateRefreshTimer !== null) {
+    window.clearTimeout(aiReplyStateRefreshTimer);
+    aiReplyStateRefreshTimer = null;
+  }
+});
+
+const scheduleAiReplyStateRefresh = (conversationId: string) => {
+  if (aiReplyStateRefreshTimer !== null) {
+    window.clearTimeout(aiReplyStateRefreshTimer);
+  }
+  aiReplyStateRefreshTimer = window.setTimeout(() => {
+    void leadDetailStore.fetchMessages(conversationId, { silent: true });
+    aiReplyStateRefreshTimer = null;
+  }, 5 * 60 * 1000 + 1000);
+};
+
 watch(
   () => locale.value,
-  (value) => {
-    void leadDetailStore.fetchLead(leadId, value);
+  async (value) => {
+    await leadDetailStore.fetchLead(leadId, value);
   }
+);
+
+watch(
+  () => lead.value?.conversation_id,
+  (conversationId) => {
+    if (conversationId) {
+      leadDetailStore.startMessagePolling(conversationId);
+      return;
+    }
+    leadDetailStore.stopMessagePolling();
+  },
+  { immediate: true },
 );
 
 const getAppointmentStatusLabel = (status?: string) => {
@@ -527,6 +558,12 @@ const handleSendManualReply = async () => {
   try {
     replying.value = true;
     await leadDetailStore.sendManualReply(conversationId, content);
+    if (!aiReplyEnabled.value) {
+      scheduleAiReplyStateRefresh(conversationId);
+    } else if (aiReplyStateRefreshTimer !== null) {
+      window.clearTimeout(aiReplyStateRefreshTimer);
+      aiReplyStateRefreshTimer = null;
+    }
     manualReply.value = '';
     ElMessage.success('人工回复已发送，家长端可见');
   } catch (e: any) {
@@ -546,6 +583,13 @@ const handleToggleAiReply = async () => {
     togglingAiReply.value = true;
     const nextEnabled = !aiReplyEnabled.value;
     await leadDetailStore.setAiReplyEnabled(conversationId, nextEnabled);
+    if (aiReplyStateRefreshTimer !== null) {
+      window.clearTimeout(aiReplyStateRefreshTimer);
+      aiReplyStateRefreshTimer = null;
+    }
+    if (!nextEnabled) {
+      scheduleAiReplyStateRefresh(conversationId);
+    }
     ElMessage.success(nextEnabled ? '已开启 AI 回复' : '已关闭 AI 回复');
   } catch (e: any) {
     console.error(e);

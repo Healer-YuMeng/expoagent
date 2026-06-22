@@ -11,6 +11,7 @@ export interface ParentAssistantItem {
   name: string;
   school_id: string;
   knowledge_base_id?: string | null;
+  knowledge_base_ids?: string[];
   is_active: boolean;
 }
 

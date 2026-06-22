@@ -25,13 +25,37 @@ class AssistantService:
         text = str(value).strip()
         return text or None
 
+    @classmethod
+    def _normalize_knowledge_base_ids(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, (list, tuple, set)):
+            raw_items = list(value)
+        else:
+            raw_items = [value]
+        items: list[str] = []
+        seen: set[str] = set()
+        for raw in raw_items:
+            text = cls._normalize_text(raw)
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            items.append(text)
+        return items
+
     def _row_to_assistant(self, row: dict[str, Any]) -> dict[str, Any]:
+        knowledge_base_ids = self._normalize_knowledge_base_ids(row.get("knowledge_base_ids"))
+        if not knowledge_base_ids:
+            legacy_knowledge_base_id = self._normalize_text(row.get("knowledge_base_id"))
+            if legacy_knowledge_base_id:
+                knowledge_base_ids = [legacy_knowledge_base_id]
         return {
             "id": str(row.get("_id")),
             "name": self._normalize_text(row.get("name")) or "",
             "school_id": self._normalize_text(row.get("school_id")) or "",
             "admin_id": self._normalize_text(row.get("admin_id")),
-            "knowledge_base_id": self._normalize_text(row.get("knowledge_base_id")),
+            "knowledge_base_id": knowledge_base_ids[0] if knowledge_base_ids else None,
+            "knowledge_base_ids": knowledge_base_ids,
             "is_active": bool(row.get("is_active", True)),
             "created_at": row.get("created_at"),
             "updated_at": row.get("updated_at"),
@@ -71,15 +95,20 @@ class AssistantService:
         school_id: str,
         admin_id: Optional[str] = None,
         knowledge_base_id: Optional[str] = None,
+        knowledge_base_ids: Optional[list[str]] = None,
     ) -> dict[str, Any]:
         await self._ensure_collection()
         assistant_id = str(uuid.uuid4())
+        normalized_knowledge_base_ids = self._normalize_knowledge_base_ids(knowledge_base_ids)
+        if not normalized_knowledge_base_ids:
+            normalized_knowledge_base_ids = self._normalize_knowledge_base_ids(knowledge_base_id)
         assistant = AssistantSchema(
             _id=assistant_id,
             name=name,
             school_id=school_id,
             admin_id=admin_id,
-            knowledge_base_id=knowledge_base_id,
+            knowledge_base_id=normalized_knowledge_base_ids[0] if normalized_knowledge_base_ids else None,
+            knowledge_base_ids=normalized_knowledge_base_ids,
         )
         await self.db[ASSISTANT_COLLECTION].insert_one(assistant.model_dump(by_alias=True, exclude_none=True))
         created = await self.get_assistant(assistant_id)
@@ -87,7 +116,19 @@ class AssistantService:
 
     async def update_assistant(self, assistant_id: str, **fields) -> Optional[dict[str, Any]]:
         await self._ensure_collection()
-        update_fields = {key: value for key, value in fields.items() if value is not None or key == "knowledge_base_id"}
+        if "knowledge_base_ids" in fields:
+            normalized_knowledge_base_ids = self._normalize_knowledge_base_ids(fields.get("knowledge_base_ids"))
+            fields["knowledge_base_ids"] = normalized_knowledge_base_ids
+            fields["knowledge_base_id"] = normalized_knowledge_base_ids[0] if normalized_knowledge_base_ids else None
+        elif "knowledge_base_id" in fields:
+            normalized_knowledge_base_ids = self._normalize_knowledge_base_ids(fields.get("knowledge_base_id"))
+            fields["knowledge_base_ids"] = normalized_knowledge_base_ids
+            fields["knowledge_base_id"] = normalized_knowledge_base_ids[0] if normalized_knowledge_base_ids else None
+        update_fields = {
+            key: value
+            for key, value in fields.items()
+            if value is not None or key in {"knowledge_base_id", "knowledge_base_ids"}
+        }
         update_fields["updated_at"] = datetime.utcnow()
         result = await self.db[ASSISTANT_COLLECTION].update_one(
             {"_id": assistant_id},

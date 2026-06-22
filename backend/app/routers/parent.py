@@ -29,6 +29,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/parent", tags=["家长端"])
+AI_REPLY_AUTO_RESUME_DELAY_SECONDS = 300
 
 
 # ========== 请求/响应模型 ==========
@@ -118,6 +119,40 @@ DEFAULT_WELCOME_MESSAGES = {
 DEFAULT_WELCOME_MESSAGE = DEFAULT_WELCOME_MESSAGES["zh-CN"]
 PROFILE_COLLECTION = "conversation_profiles"
 SYSTEM_SETTINGS_COLLECTION = "system_settings"
+
+
+async def _ensure_ai_reply_auto_resumed(
+    db: PostgresCompatDatabase,
+    conversation: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if not conversation:
+        return conversation
+    if bool(conversation.get("ai_reply_enabled", True)):
+        return conversation
+    if not bool(conversation.get("ai_reply_auto_resume_pending", False)):
+        return conversation
+    disabled_at = conversation.get("ai_reply_disabled_at")
+    if not isinstance(disabled_at, datetime):
+        return conversation
+    now = datetime.utcnow()
+    if (now - disabled_at).total_seconds() < AI_REPLY_AUTO_RESUME_DELAY_SECONDS:
+        return conversation
+    await db.conversations.update_one(
+        {"_id": conversation["_id"]},
+        {
+            "$set": {
+                "ai_reply_enabled": True,
+                "updated_at": now,
+                "ai_reply_auto_resume_pending": False,
+            },
+            "$unset": {
+                "ai_reply_disabled_at": "",
+            },
+        },
+    )
+    refreshed = await db.conversations.find_one({"_id": conversation["_id"]})
+    logger.info("Conversation %s lazily auto re-enabled AI reply after timeout", conversation.get("_id"))
+    return refreshed or conversation
 WELCOME_MESSAGE_KEY = "chat_welcome_message"
 DEFAULT_WELCOME_SCOPE = "default_school"
 INVALID_CONTACT_PROMPTS = {
@@ -1912,7 +1947,19 @@ async def send_message(
         conv_dict["updated_at"] = updated_at
         effective_assistant_id = request_assistant_id
         conversation_assistant_id = request_assistant_id
-    assistant_knowledge_base_id = assistant.get("knowledge_base_id") if assistant else None
+    assistant_knowledge_base_ids: list[str] = []
+    if assistant:
+        raw_knowledge_base_ids = assistant.get("knowledge_base_ids")
+        if isinstance(raw_knowledge_base_ids, list):
+            assistant_knowledge_base_ids = [
+                str(item).strip()
+                for item in raw_knowledge_base_ids
+                if str(item).strip()
+            ]
+        if not assistant_knowledge_base_ids:
+            legacy_knowledge_base_id = str(assistant.get("knowledge_base_id") or "").strip()
+            if legacy_knowledge_base_id:
+                assistant_knowledge_base_ids = [legacy_knowledge_base_id]
     request_school_id = (request.school_id or "").strip() or None
     effective_school_id = (
         conversation_school_id
@@ -2016,7 +2063,11 @@ async def send_message(
         full_answer = ""  # 累积完整答案
         
         try:
-            latest_conversation = await db.conversations.find_one({"_id": conv_id}, {"ai_reply_enabled": 1})
+            latest_conversation = await db.conversations.find_one(
+                {"_id": conv_id},
+                {"ai_reply_enabled": 1, "ai_reply_auto_resume_pending": 1, "ai_reply_disabled_at": 1, "_id": 1},
+            )
+            latest_conversation = await _ensure_ai_reply_auto_resumed(db, latest_conversation)
             latest_ai_reply_enabled = bool(
                 latest_conversation.get("ai_reply_enabled", ai_reply_enabled)
             ) if latest_conversation else ai_reply_enabled
@@ -2036,7 +2087,7 @@ async def send_message(
                     request.content,
                     top_k=settings.CHROMA_TOP_K,
                     school_key=effective_school_id,
-                    knowledge_base_id=assistant_knowledge_base_id,
+                    knowledge_base_ids=assistant_knowledge_base_ids or None,
                 )
                 logger.info(
                     "知识库检索完成: conversation=%s effective_school_id=%s hits=%d query=%s",
@@ -2074,7 +2125,7 @@ async def send_message(
                 documents=retrieved_docs,
                 school_id=effective_school_id,
                 assistant_id=effective_assistant_id,
-                knowledge_base_id=assistant_knowledge_base_id,
+                knowledge_base_ids=assistant_knowledge_base_ids or None,
                 locale=request.language,
                 runtime_instructions=runtime_instructions,
             ):

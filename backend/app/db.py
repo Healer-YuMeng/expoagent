@@ -218,6 +218,19 @@ def _set_path(document: dict[str, Any], path: str, value: Any) -> None:
     current[parts[-1]] = _normalize_document(value)
 
 
+def _delete_path(document: dict[str, Any], path: str) -> None:
+    parts = _split_path(path)
+    if not parts:
+        return
+    current: Any = document
+    for part in parts[:-1]:
+        if not isinstance(current, dict) or part not in current:
+            return
+        current = current.get(part)
+    if isinstance(current, dict):
+        current.pop(parts[-1], None)
+
+
 def _match_value(actual: Any, expected: Any) -> bool:
     return _coerce_comparable(actual) == _coerce_comparable(expected)
 
@@ -373,6 +386,10 @@ def _apply_update(document: dict[str, Any], update: dict[str, Any], *, is_insert
             items.append(_normalize_document(value))
             _set_path(doc, path, items)
 
+    if "$unset" in update:
+        for path in update["$unset"].keys():
+            _delete_path(doc, path)
+
     return doc
 
 
@@ -436,6 +453,8 @@ COLLECTION_SCHEMAS: dict[str, CollectionSchema] = {
             _col("school_id", "TEXT"),
             _col("assistant_id", "TEXT"),
             _col("ai_reply_enabled", "BOOLEAN", default_sql="TRUE"),
+            _col("ai_reply_disabled_at", "TIMESTAMPTZ"),
+            _col("ai_reply_auto_resume_pending", "BOOLEAN", default_sql="FALSE"),
             _json_col("appointment"),
             _col("source_channel", "TEXT"),
             _col("channel_appointment_logged", "BOOLEAN", default_sql="FALSE"),
@@ -591,6 +610,7 @@ COLLECTION_SCHEMAS: dict[str, CollectionSchema] = {
             _col("school_id", "TEXT"),
             _col("admin_id", "TEXT"),
             _col("knowledge_base_id", "TEXT"),
+            _json_col("knowledge_base_ids", default_json="'[]'"),
             _col("is_active", "BOOLEAN", default_sql="TRUE"),
             _col("created_at", "TIMESTAMPTZ"),
             _col("updated_at", "TIMESTAMPTZ"),
