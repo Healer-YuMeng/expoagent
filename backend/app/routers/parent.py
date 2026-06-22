@@ -6,7 +6,7 @@ import asyncio
 import json
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from typing import Any, Optional, List, AsyncGenerator, Sequence
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -121,6 +121,14 @@ PROFILE_COLLECTION = "conversation_profiles"
 SYSTEM_SETTINGS_COLLECTION = "system_settings"
 
 
+def _normalize_utc_naive_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 async def _ensure_ai_reply_auto_resumed(
     db: PostgresCompatDatabase,
     conversation: dict[str, Any] | None,
@@ -133,6 +141,9 @@ async def _ensure_ai_reply_auto_resumed(
         return conversation
     disabled_at = conversation.get("ai_reply_disabled_at")
     if not isinstance(disabled_at, datetime):
+        return conversation
+    disabled_at = _normalize_utc_naive_datetime(disabled_at)
+    if disabled_at is None:
         return conversation
     now = datetime.utcnow()
     if (now - disabled_at).total_seconds() < AI_REPLY_AUTO_RESUME_DELAY_SECONDS:

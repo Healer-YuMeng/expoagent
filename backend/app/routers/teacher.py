@@ -4,7 +4,7 @@
 """
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -244,6 +244,14 @@ def _compute_effective_ai_reply_enabled(
     return bool(conversation.get("ai_reply_enabled", True))
 
 
+def _normalize_utc_naive_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 async def _ensure_ai_reply_auto_resumed(
     db: PostgresCompatDatabase,
     conversation: dict[str, Any] | None,
@@ -256,6 +264,9 @@ async def _ensure_ai_reply_auto_resumed(
         return conversation
     disabled_at = conversation.get("ai_reply_disabled_at")
     if not isinstance(disabled_at, datetime):
+        return conversation
+    disabled_at = _normalize_utc_naive_datetime(disabled_at)
+    if disabled_at is None:
         return conversation
     now = datetime.utcnow()
     if (now - disabled_at).total_seconds() < AI_REPLY_AUTO_RESUME_DELAY_SECONDS:
@@ -302,7 +313,11 @@ async def _auto_resume_ai_reply_after_timeout(
         current_disabled_at = conversation.get("ai_reply_disabled_at")
         if not isinstance(current_disabled_at, datetime):
             return
-        if abs((current_disabled_at - disabled_at).total_seconds()) > 1:
+        current_disabled_at = _normalize_utc_naive_datetime(current_disabled_at)
+        normalized_disabled_at = _normalize_utc_naive_datetime(disabled_at)
+        if current_disabled_at is None or normalized_disabled_at is None:
+            return
+        if abs((current_disabled_at - normalized_disabled_at).total_seconds()) > 1:
             return
         if bool(conversation.get("ai_reply_enabled", True)):
             return
