@@ -136,6 +136,41 @@ def _looks_incomplete_translation(source_text: str, translated_text: str | None)
     return False
 
 
+def _is_chinese_variant_translation(source_lang: str, target_lang: str) -> bool:
+    return {source_lang, target_lang} == {"zh-CN", "zh-TW"}
+
+
+async def _retry_strict_chinese_variant_conversion(
+    *,
+    langchain_service,
+    source_text: str,
+    source_lang: str,
+    target_lang: str,
+) -> str | None:
+    variant_name = "繁體中文" if target_lang == "zh-TW" else "简体中文"
+    system_prompt = (
+        "你是一位专业的中文文字转换助手。"
+        "你只负责在简体中文和繁体中文之间进行严格转换，保持原意、语气、标点和换行。"
+    )
+    user_prompt = f"""请将以下{source_lang}文本严格转换为{variant_name}：
+
+{source_text}
+
+转换要求：
+1. 只做简繁体文字转换，不要改写句子。
+2. 保留原有标点、格式和换行。
+3. 不要添加解释，只返回转换后的文本。"""
+
+    converted_text = await langchain_service.complete_text(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        temperature=0,
+        max_tokens=1024,
+    )
+    normalized = (converted_text or "").strip()
+    return normalized or None
+
+
 async def _translate_single_welcome_message(
     *,
     langchain_service,
@@ -165,9 +200,21 @@ async def _translate_single_welcome_message(
         temperature=0,
         max_tokens=1024,
     )
-    if _looks_incomplete_translation(source_text, translated_text):
+    normalized_text = (translated_text or "").strip()
+    if _is_chinese_variant_translation(source_lang, target_lang):
+        if normalized_text == source_text.strip():
+            return target_lang, source_text.strip()
+        normalized_text = await _retry_strict_chinese_variant_conversion(
+            langchain_service=langchain_service,
+            source_text=source_text,
+            source_lang=source_lang,
+            target_lang=target_lang,
+        ) or normalized_text
+        if normalized_text == source_text.strip():
+            return target_lang, source_text.strip()
+    if _looks_incomplete_translation(source_text, normalized_text):
         return target_lang, None
-    return target_lang, translated_text.strip()
+    return target_lang, normalized_text
 
 
 def _should_hide_teacher_message(message_doc: dict) -> bool:

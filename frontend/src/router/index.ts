@@ -47,7 +47,7 @@ const routes = [
         path: 'knowledge-base',
         name: 'KnowledgeBase',
         component: () => import('@/views/teacher/KnowledgeBaseView.vue'),
-        meta: { roles: ['school_admin'] },
+        meta: { roles: ['teacher', 'school_admin'] },
       },
       {
         path: 'system-prompt',
