@@ -1,11 +1,11 @@
 | 服务           | 端口 | 用途         |
 | ------------- | ----: | ---------- |
-| frontend      | 8006 | 前端访问入口     |
-| backend       | 9008 | 后端 API     |
-| postgres      | 5436 | PostgreSQL |
-| redis         | 6396 | Redis      |
-| minio api     | 9003 | MinIO API  |
-| minio console | 9004 | MinIO 控制台  |
+| frontend      | 8606 | 前端访问入口     |
+| backend       | 9608 | 后端 API     |
+| postgres      | 5636 | PostgreSQL |
+| redis         | 6596 | Redis      |
+| minio api     | 9613 | MinIO API  |
+| minio console | 9614 | MinIO 控制台  |
 
 # general_agent / YCIS 智能招生助手
 
@@ -265,10 +265,10 @@ flowchart LR
 
 当前端口：
 
-- PostgreSQL: `5436`
-- Redis: `6396`
-- MinIO API: `9003`
-- MinIO Console: `9004`
+- PostgreSQL: `5636`
+- Redis: `6596`
+- MinIO API: `9613`
+- MinIO Console: `9614`
 
 ---
 
@@ -322,8 +322,8 @@ cp .env.example .env
 重要变量示例：
 
 ```bash
-POSTGRES_HOST_PORT=5436
-POSTGRES_URL=postgresql://postgres:password123@localhost:5436/general_agent_admissions
+POSTGRES_HOST_PORT=5636
+POSTGRES_URL=postgresql://postgres:password123@localhost:5636/general_agent_admissions
 POSTGRES_SSL=False
 DB_NAME=general_agent_admissions
 
@@ -411,7 +411,7 @@ conda activate ycis
 
 说明：
 
-- 默认监听 `http://127.0.0.1:9008`
+- 默认监听 `http://127.0.0.1:9608`
 - 默认开启热重载
 - 如果要关闭热重载：
 
@@ -433,7 +433,7 @@ BACKEND_RELOAD=0 ./scripts/dev/start-backend.sh
 
 说明：
 
-- 默认监听 `http://127.0.0.1:8006`
+- 默认监听 `http://127.0.0.1:8606`
 - 局域网访问：
 
 ```bash
@@ -442,10 +442,10 @@ FRONTEND_HOST=0.0.0.0 ./scripts/dev/start-frontend.sh
 
 ### 7.4 访问地址
 
-- 首页：`http://localhost:8006`
-- 登录页：`http://localhost:8006/auth/login`
-- 后端 API 文档：`http://localhost:9008/docs`
-- 健康检查：`http://localhost:9008/health`
+- 首页：`http://localhost:8606`
+- 登录页：`http://localhost:8606/auth/login`
+- 后端 API 文档：`http://localhost:9608/docs`
+- 健康检查：`http://localhost:9608/health`
 
 ---
 
@@ -580,12 +580,12 @@ FRONTEND_HOST=0.0.0.0 ./scripts/dev/start-frontend.sh
 
 ## 11. API 测试示例
 
-这里只保留最常用的几条，完整联调时建议直接看 `http://localhost:9008/docs`。
+这里只保留最常用的几条，完整联调时建议直接看 `http://localhost:9608/docs`。
 
 ### 11.1 登录
 
 ```bash
-curl -X POST "http://localhost:9008/api/v1/auth/login" \
+curl -X POST "http://localhost:9608/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"phone":"13800000002","password":"123456"}'
 ```
@@ -593,7 +593,7 @@ curl -X POST "http://localhost:9008/api/v1/auth/login" \
 ### 11.2 创建匿名会话
 
 ```bash
-curl -X POST "http://localhost:9008/api/v1/auth/anonymous-session" \
+curl -X POST "http://localhost:9608/api/v1/auth/anonymous-session" \
   -H "Content-Type: application/json" \
   -d '{}'
 ```
@@ -601,7 +601,7 @@ curl -X POST "http://localhost:9008/api/v1/auth/anonymous-session" \
 ### 11.3 发送家长消息
 
 ```bash
-curl -X POST "http://localhost:9008/api/v1/parent/conversations/<conversation_id>/messages" \
+curl -X POST "http://localhost:9608/api/v1/parent/conversations/<conversation_id>/messages" \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"content":"学校有哪些课程？"}'
@@ -811,7 +811,7 @@ python -m app.integrations.dustess.main decrypt --signature=... --timestamp=... 
 ### 15.3 Callback 调试
 
 ```bash
-uvicorn app.integrations.dustess.server:app --reload --host 0.0.0.0 --port 9008
+uvicorn app.integrations.dustess.server:app --reload --host 0.0.0.0 --port 9608
 ```
 
 回调路径：
@@ -832,11 +832,11 @@ uvicorn app.integrations.dustess.server:app --reload --host 0.0.0.0 --port 9008
 
 ```text
 Browser
-  -> Frontend :8006
-  -> Backend  :9008
-  -> PostgreSQL :5436
-  -> Redis    :6396
-  -> MinIO    :9003 / :9004
+  -> Frontend :8606
+  -> Backend  :9608
+  -> PostgreSQL :5636
+  -> Redis    :6596
+  -> MinIO    :9613 / :9614
 ```
 
 ### 16.3 常见排查
@@ -923,8 +923,8 @@ python backend/scripts/verify_config.py
 先检查：
 
 1. 后端是否已启动
-2. Vite 代理目标是否通向 `127.0.0.1:9008`
-3. 浏览器访问 `http://localhost:9008/docs` 是否正常
+2. Vite 代理目标是否通向 `127.0.0.1:9608`
+3. 浏览器访问 `http://localhost:9608/docs` 是否正常
 
 ### 20.3 PostgreSQL 连不上
 
@@ -932,7 +932,7 @@ python backend/scripts/verify_config.py
 
 1. `docker compose ps`
 2. `POSTGRES_URL`
-3. 映射端口 `5436`
+3. 映射端口 `5636`
 
 ### 20.4 聊天没有知识库效果
 
