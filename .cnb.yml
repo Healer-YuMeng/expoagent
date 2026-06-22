@@ -52,3 +52,6 @@ main:
   push:
     - *build_and_push_backend
     - *build_and_push_frontend
+  api_trigger:
+    - *build_and_push_backend
+    - *build_and_push_frontend
