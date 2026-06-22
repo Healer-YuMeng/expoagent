@@ -22,6 +22,7 @@ class AssistantCreateRequest(BaseModel):
 class AssistantUpdateRequest(BaseModel):
     name: Optional[str] = None
     knowledge_base_id: Optional[str] = None
+    knowledge_base_ids: Optional[list[str]] = None
     is_active: Optional[bool] = None
 
 
@@ -83,19 +84,38 @@ async def update_assistant(
     if current_user.role == "school_admin" and assistant.get("school_id") != current_user.school_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权操作其他学校助手")
 
-    knowledge_base_id = payload.knowledge_base_id
-    if knowledge_base_id:
+    knowledge_base_ids: Optional[list[str]] = None
+    if "knowledge_base_ids" in payload.model_fields_set:
+        knowledge_base_ids = []
+        seen_ids: set[str] = set()
+        for raw_id in payload.knowledge_base_ids or []:
+            normalized_id = str(raw_id or "").strip()
+            if not normalized_id or normalized_id in seen_ids:
+                continue
+            seen_ids.add(normalized_id)
+            knowledge_base_ids.append(normalized_id)
+    elif "knowledge_base_id" in payload.model_fields_set:
+        normalized_id = str(payload.knowledge_base_id or "").strip()
+        knowledge_base_ids = [normalized_id] if normalized_id else []
+
+    for knowledge_base_id in knowledge_base_ids or []:
         kb = await db["rag_knowledge_bases"].find_one({"_id": knowledge_base_id})
         if not kb:
             raise HTTPException(status_code=404, detail="知识库不存在")
         if str(kb.get("school_id") or "") != str(assistant.get("school_id") or ""):
             raise HTTPException(status_code=400, detail="知识库不属于当前助手所在学校")
 
+    update_fields: dict[str, object] = {}
+    if isinstance(payload.name, str) and payload.name.strip():
+        update_fields["name"] = payload.name.strip()
+    if knowledge_base_ids is not None:
+        update_fields["knowledge_base_ids"] = knowledge_base_ids
+    if payload.is_active is not None:
+        update_fields["is_active"] = payload.is_active
+
     updated = await service.update_assistant(
         assistant_id,
-        name=payload.name.strip() if isinstance(payload.name, str) and payload.name.strip() else None,
-        knowledge_base_id=knowledge_base_id,
-        is_active=payload.is_active,
+        **update_fields,
     )
     if not updated:
         raise HTTPException(status_code=404, detail="助手不存在")

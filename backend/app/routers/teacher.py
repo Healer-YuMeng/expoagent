@@ -28,6 +28,8 @@ from app.routers.utils import build_lead_chat_lookup
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/teacher", tags=["老师端"])
+AI_REPLY_AUTO_RESUME_DELAY_SECONDS = 300
+_ai_reply_auto_resume_tasks: dict[str, asyncio.Task] = {}
 HIDDEN_TEACHER_MESSAGE_TAGS = {"manual_callback_prompt"}
 WELCOME_MESSAGE_TRANSLATION_TARGETS = {
     "en": "English",
@@ -136,6 +138,41 @@ def _looks_incomplete_translation(source_text: str, translated_text: str | None)
     return False
 
 
+def _is_chinese_variant_translation(source_lang: str, target_lang: str) -> bool:
+    return {source_lang, target_lang} == {"zh-CN", "zh-TW"}
+
+
+async def _retry_strict_chinese_variant_conversion(
+    *,
+    langchain_service,
+    source_text: str,
+    source_lang: str,
+    target_lang: str,
+) -> str | None:
+    variant_name = "繁體中文" if target_lang == "zh-TW" else "简体中文"
+    system_prompt = (
+        "你是一位专业的中文文字转换助手。"
+        "你只负责在简体中文和繁体中文之间进行严格转换，保持原意、语气、标点和换行。"
+    )
+    user_prompt = f"""请将以下{source_lang}文本严格转换为{variant_name}：
+
+{source_text}
+
+转换要求：
+1. 只做简繁体文字转换，不要改写句子。
+2. 保留原有标点、格式和换行。
+3. 不要添加解释，只返回转换后的文本。"""
+
+    converted_text = await langchain_service.complete_text(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        temperature=0,
+        max_tokens=1024,
+    )
+    normalized = (converted_text or "").strip()
+    return normalized or None
+
+
 async def _translate_single_welcome_message(
     *,
     langchain_service,
@@ -165,9 +202,21 @@ async def _translate_single_welcome_message(
         temperature=0,
         max_tokens=1024,
     )
-    if _looks_incomplete_translation(source_text, translated_text):
+    normalized_text = (translated_text or "").strip()
+    if _is_chinese_variant_translation(source_lang, target_lang):
+        if normalized_text == source_text.strip():
+            return target_lang, source_text.strip()
+        normalized_text = await _retry_strict_chinese_variant_conversion(
+            langchain_service=langchain_service,
+            source_text=source_text,
+            source_lang=source_lang,
+            target_lang=target_lang,
+        ) or normalized_text
+        if normalized_text == source_text.strip():
+            return target_lang, source_text.strip()
+    if _looks_incomplete_translation(source_text, normalized_text):
         return target_lang, None
-    return target_lang, translated_text.strip()
+    return target_lang, normalized_text
 
 
 def _should_hide_teacher_message(message_doc: dict) -> bool:
@@ -192,10 +241,112 @@ def _compute_effective_ai_reply_enabled(
     conversation: dict[str, Any],
     lead: dict[str, Any] | None,
 ) -> bool:
-    conversation_enabled = bool(conversation.get("ai_reply_enabled", True))
-    if not lead or "ai_reply_enabled" not in lead:
-        return conversation_enabled
-    return conversation_enabled and bool(lead.get("ai_reply_enabled", True))
+    return bool(conversation.get("ai_reply_enabled", True))
+
+
+async def _ensure_ai_reply_auto_resumed(
+    db: PostgresCompatDatabase,
+    conversation: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if not conversation:
+        return conversation
+    if bool(conversation.get("ai_reply_enabled", True)):
+        return conversation
+    if not bool(conversation.get("ai_reply_auto_resume_pending", False)):
+        return conversation
+    disabled_at = conversation.get("ai_reply_disabled_at")
+    if not isinstance(disabled_at, datetime):
+        return conversation
+    now = datetime.utcnow()
+    if (now - disabled_at).total_seconds() < AI_REPLY_AUTO_RESUME_DELAY_SECONDS:
+        return conversation
+    conversation_id = str(conversation.get("_id") or "")
+    if not conversation_id:
+        return conversation
+    _cancel_ai_reply_auto_resume_task(conversation_id)
+    await db.conversations.update_one(
+        {"_id": conversation["_id"]},
+        {
+            "$set": {
+                "ai_reply_enabled": True,
+                "updated_at": now,
+                "ai_reply_auto_resume_pending": False,
+            },
+            "$unset": {
+                "ai_reply_disabled_at": "",
+            },
+        },
+    )
+    refreshed = await db.conversations.find_one({"_id": conversation["_id"]})
+    logger.info("Conversation %s lazily auto re-enabled AI reply after timeout", conversation_id)
+    return refreshed or conversation
+
+
+def _cancel_ai_reply_auto_resume_task(conversation_id: str) -> None:
+    task = _ai_reply_auto_resume_tasks.pop(conversation_id, None)
+    if task and not task.done():
+        task.cancel()
+
+
+async def _auto_resume_ai_reply_after_timeout(
+    *,
+    db: PostgresCompatDatabase,
+    conversation_id: str,
+    disabled_at: datetime,
+) -> None:
+    try:
+        await asyncio.sleep(AI_REPLY_AUTO_RESUME_DELAY_SECONDS)
+        conversation = await db.conversations.find_one({"_id": conversation_id})
+        if not conversation:
+            return
+        current_disabled_at = conversation.get("ai_reply_disabled_at")
+        if not isinstance(current_disabled_at, datetime):
+            return
+        if abs((current_disabled_at - disabled_at).total_seconds()) > 1:
+            return
+        if bool(conversation.get("ai_reply_enabled", True)):
+            return
+        if not bool(conversation.get("ai_reply_auto_resume_pending", False)):
+            return
+        now = datetime.utcnow()
+        await db.conversations.update_one(
+            {"_id": conversation_id},
+            {
+                "$set": {
+                    "ai_reply_enabled": True,
+                    "updated_at": now,
+                    "ai_reply_auto_resume_pending": False,
+                },
+                "$unset": {
+                    "ai_reply_disabled_at": "",
+                },
+            },
+        )
+        logger.info("Conversation %s auto re-enabled AI reply after teacher timeout", conversation_id)
+    except asyncio.CancelledError:
+        return
+    except Exception:
+        logger.exception("Failed to auto resume AI reply for conversation %s", conversation_id)
+    finally:
+        stored_task = _ai_reply_auto_resume_tasks.get(conversation_id)
+        if stored_task is asyncio.current_task():
+            _ai_reply_auto_resume_tasks.pop(conversation_id, None)
+
+
+def _schedule_ai_reply_auto_resume(
+    *,
+    db: PostgresCompatDatabase,
+    conversation_id: str,
+    disabled_at: datetime,
+) -> None:
+    _cancel_ai_reply_auto_resume_task(conversation_id)
+    _ai_reply_auto_resume_tasks[conversation_id] = asyncio.create_task(
+        _auto_resume_ai_reply_after_timeout(
+            db=db,
+            conversation_id=conversation_id,
+            disabled_at=disabled_at,
+        )
+    )
 
 @router.get("/dashboard", summary="获取老师工作台摘要数据")
 async def get_teacher_dashboard(
@@ -502,6 +653,7 @@ async def get_conversation_messages(
     conversation = await db.conversations.find_one({"_id": {"$in": candidates}})
     if not conversation:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="会话不存在")
+    conversation = await _ensure_ai_reply_auto_resumed(db, conversation)
     resolved_conversation_id = str(conversation.get("_id"))
     lead = await _get_lead_for_conversation(db, resolved_conversation_id)
 
@@ -555,37 +707,45 @@ async def update_conversation_ai_reply(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="会话不存在")
 
     now = datetime.utcnow()
-    resolved_conversation_id = str(conversation.get("_id"))
-    lead = await _get_lead_for_conversation(db, resolved_conversation_id)
-
-    conversation_filter: dict[str, Any] = {"_id": conversation["_id"]}
-    parent_id = conversation.get("parent_id")
-    scope_school_id = (
-        (lead.get("school_id") if lead else None)
-        or conversation.get("school_id")
-    )
-    if parent_id:
-        conversation_filter = {"parent_id": parent_id}
-        if scope_school_id:
-            conversation_filter["school_id"] = scope_school_id
-
-    await db.conversations.update_many(
-        conversation_filter,
-        {"$set": {"ai_reply_enabled": bool(request.enabled), "updated_at": now}},
-    )
-    if lead:
-        await db.leads.update_one(
-            {"_id": lead["_id"]},
-            {"$set": {"ai_reply_enabled": bool(request.enabled), "updated_at": now}},
+    conversation_id_str = str(conversation["_id"])
+    if request.enabled:
+        _cancel_ai_reply_auto_resume_task(conversation_id_str)
+        await db.conversations.update_one(
+            {"_id": conversation["_id"]},
+            {
+                "$set": {
+                    "ai_reply_enabled": True,
+                    "updated_at": now,
+                    "ai_reply_auto_resume_pending": False,
+                },
+                "$unset": {
+                    "ai_reply_disabled_at": "",
+                },
+            },
+        )
+    else:
+        await db.conversations.update_one(
+            {"_id": conversation["_id"]},
+            {
+                "$set": {
+                    "ai_reply_enabled": False,
+                    "updated_at": now,
+                    "ai_reply_disabled_at": now,
+                    "ai_reply_auto_resume_pending": True,
+                },
+            },
+        )
+        _schedule_ai_reply_auto_resume(
+            db=db,
+            conversation_id=conversation_id_str,
+            disabled_at=now,
         )
 
     logger.info(
-        "Teacher %s set ai_reply_enabled=%s for conversation %s scope=%s lead=%s",
+        "Teacher %s set ai_reply_enabled=%s for conversation %s",
         current_user.id,
         request.enabled,
         conversation_id,
-        conversation_filter,
-        str(lead.get("_id")) if lead else None,
     )
     return {"conversation_id": conversation_id, "ai_reply_enabled": bool(request.enabled)}
 
@@ -625,15 +785,24 @@ async def send_teacher_message(
 
     now = message.created_at
     message_count = await db.messages.count_documents({"conversation_id": {"$in": candidates}})
+    conversation_update: dict[str, Any] = {
+        "message_count": message_count,
+        "last_message_at": now,
+        "updated_at": now,
+    }
+    update_doc: dict[str, Any] = {"$set": conversation_update}
+    if not bool(conversation.get("ai_reply_enabled", True)):
+        conversation_update["ai_reply_disabled_at"] = now
+        conversation_update["ai_reply_auto_resume_pending"] = True
+        _schedule_ai_reply_auto_resume(
+            db=db,
+            conversation_id=str(conversation["_id"]),
+            disabled_at=now,
+        )
+
     await db.conversations.update_one(
         {"_id": conversation["_id"]},
-        {
-            "$set": {
-                "message_count": message_count,
-                "last_message_at": now,
-                "updated_at": now,
-            }
-        },
+        update_doc,
     )
 
     logger.info("Teacher %s replied conversation %s", current_user.id, conversation_id)

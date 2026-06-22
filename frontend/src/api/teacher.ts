@@ -105,6 +105,7 @@ export interface AssistantItem {
   school_id: string;
   admin_id?: string | null;
   knowledge_base_id?: string | null;
+  knowledge_base_ids?: string[];
   is_active: boolean;
 }
 
@@ -137,7 +138,7 @@ export function createAssistant(data: { name: string; school_id?: string | null 
 
 export function updateAssistant(
   assistantId: string,
-  data: { name?: string; knowledge_base_id?: string | null; is_active?: boolean },
+  data: { name?: string; knowledge_base_id?: string | null; knowledge_base_ids?: string[]; is_active?: boolean },
 ): Promise<AssistantItem> {
   return request.patch(`/v1/assistants/${assistantId}`, data);
 }

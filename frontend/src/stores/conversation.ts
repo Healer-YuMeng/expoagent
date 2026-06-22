@@ -139,7 +139,30 @@ export const useConversationStore = defineStore('conversation', () => {
       content: '',
       created_at: new Date().toISOString(),
     };
-    currentMessages.value.push(botMessage);
+    let botMessageVisible = false;
+    let botPlaceholderTimer: number | null = window.setTimeout(() => {
+      if (botMessageVisible) {
+        return;
+      }
+      botMessageVisible = true;
+      currentMessages.value.push(botMessage);
+      currentMessages.value = [...currentMessages.value];
+    }, 250);
+
+    const clearBotPlaceholderTimer = () => {
+      if (botPlaceholderTimer !== null) {
+        window.clearTimeout(botPlaceholderTimer);
+        botPlaceholderTimer = null;
+      }
+    };
+
+    const ensureBotMessageVisible = () => {
+      if (botMessageVisible) {
+        return;
+      }
+      botMessageVisible = true;
+      currentMessages.value.push(botMessage);
+    };
 
     const streamMessage = async () => {
       await ensureParentSession();
@@ -147,10 +170,17 @@ export const useConversationStore = defineStore('conversation', () => {
         try {
           const data = JSON.parse(chunk);
           if (data.answer) {
+            clearBotPlaceholderTimer();
+            ensureBotMessageVisible();
             botMessage.content += data.answer;
             currentMessages.value = [...currentMessages.value];
           }
           if (data.event === 'manual_prompt' && data.bot_message?.content) {
+            clearBotPlaceholderTimer();
+            if (botMessageVisible && !botMessage.content) {
+              currentMessages.value = currentMessages.value.filter((message) => message.id !== botMessage.id);
+              botMessageVisible = false;
+            }
             currentMessages.value.push({
               id: data.bot_message.id ?? `${Date.now()}-manual`,
               conversation_id: conversationId,
@@ -161,15 +191,21 @@ export const useConversationStore = defineStore('conversation', () => {
             currentMessages.value = [...currentMessages.value];
           }
           if (data.event === 'done' && data.bot_message) {
+            clearBotPlaceholderTimer();
+            ensureBotMessageVisible();
             botMessage.id = data.bot_message.id ?? botMessage.id;
             botMessage.content = data.bot_message.content ?? botMessage.content;
             currentMessages.value = [...currentMessages.value];
           }
           if (data.event === 'ai_disabled') {
+            clearBotPlaceholderTimer();
             currentMessages.value = currentMessages.value.filter((message) => message.id !== botMessage.id);
+            botMessageVisible = false;
             currentMessages.value = [...currentMessages.value];
           }
           if (data.error) {
+            clearBotPlaceholderTimer();
+            ensureBotMessageVisible();
             botMessage.content = '[发送失败]';
             currentMessages.value = [...currentMessages.value];
           }
@@ -182,6 +218,7 @@ export const useConversationStore = defineStore('conversation', () => {
     try {
       await streamMessage();
     } catch (error) {
+      clearBotPlaceholderTimer();
       if (error instanceof Error && /status:\s*(401|403)/.test(error.message)) {
         await ensureParentSession(true);
         await streamMessage();

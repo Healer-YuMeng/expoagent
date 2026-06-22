@@ -717,20 +717,25 @@ class LangchainService:
         documents: Optional[Sequence] = None,
         school_id: Optional[str] = None,
         assistant_id: Optional[str] = None,
-        knowledge_base_id: Optional[str] = None,
+        knowledge_base_ids: Optional[Sequence[str]] = None,
         locale: Optional[str] = None,
         runtime_instructions: Optional[Sequence[str]] = None,
     ) -> AsyncGenerator[str, None]:
         """流式返回助手回复"""
         context = "（知识库暂无匹配资料，暂时无法引用内部信息，请结合常识谨慎回答并视情况建议转人工。）"
         docs = documents
+        scoped_knowledge_base_ids = [
+            str(item).strip()
+            for item in (knowledge_base_ids or [])
+            if str(item).strip()
+        ]
         try:
             if docs is None:
                 docs = rag_search.search(
                     query,
                     top_k=settings.CHROMA_TOP_K,
                     school_key=school_id,
-                    knowledge_base_id=knowledge_base_id,
+                    knowledge_base_ids=scoped_knowledge_base_ids or None,
                 )
             context = self._format_documents(docs or [])
             self._log_retrieval(query, docs or [])
@@ -757,13 +762,13 @@ class LangchainService:
         if assistant_id:
             system_prompt = f"{system_prompt}\n\n{self._assistant_scope_instruction()}"
 
-        if assistant_id and not knowledge_base_id:
+        if assistant_id and not scoped_knowledge_base_ids:
             refusal = self._assistant_scope_refusal(locale, missing_binding=True)
             logger.info("[ChatAnswer] assistant=%s missing knowledge base binding", assistant_id)
             yield refusal
             return
 
-        if assistant_id and knowledge_base_id and not (docs or []):
+        if assistant_id and scoped_knowledge_base_ids and not (docs or []):
             refusal = self._assistant_scope_refusal(locale, missing_binding=False)
             logger.info("[ChatAnswer] assistant=%s knowledge base miss for query=%s", assistant_id, query)
             yield refusal

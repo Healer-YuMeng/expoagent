@@ -29,6 +29,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/parent", tags=["家长端"])
+AI_REPLY_AUTO_RESUME_DELAY_SECONDS = 300
 
 
 # ========== 请求/响应模型 ==========
@@ -118,18 +119,42 @@ DEFAULT_WELCOME_MESSAGES = {
 DEFAULT_WELCOME_MESSAGE = DEFAULT_WELCOME_MESSAGES["zh-CN"]
 PROFILE_COLLECTION = "conversation_profiles"
 SYSTEM_SETTINGS_COLLECTION = "system_settings"
+
+
+async def _ensure_ai_reply_auto_resumed(
+    db: PostgresCompatDatabase,
+    conversation: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if not conversation:
+        return conversation
+    if bool(conversation.get("ai_reply_enabled", True)):
+        return conversation
+    if not bool(conversation.get("ai_reply_auto_resume_pending", False)):
+        return conversation
+    disabled_at = conversation.get("ai_reply_disabled_at")
+    if not isinstance(disabled_at, datetime):
+        return conversation
+    now = datetime.utcnow()
+    if (now - disabled_at).total_seconds() < AI_REPLY_AUTO_RESUME_DELAY_SECONDS:
+        return conversation
+    await db.conversations.update_one(
+        {"_id": conversation["_id"]},
+        {
+            "$set": {
+                "ai_reply_enabled": True,
+                "updated_at": now,
+                "ai_reply_auto_resume_pending": False,
+            },
+            "$unset": {
+                "ai_reply_disabled_at": "",
+            },
+        },
+    )
+    refreshed = await db.conversations.find_one({"_id": conversation["_id"]})
+    logger.info("Conversation %s lazily auto re-enabled AI reply after timeout", conversation.get("_id"))
+    return refreshed or conversation
 WELCOME_MESSAGE_KEY = "chat_welcome_message"
 DEFAULT_WELCOME_SCOPE = "default_school"
-MANUAL_CALLBACK_PROMPTS = {
-    "zh-CN": "请问您在哪个工作日时间方便，我们会电话回访，请注意接听2226开头的座机来电～",
-    "en": "What weekday time works best for you? We will call you back, so please watch for a landline call beginning with 2226.",
-    "zh-TW": "請問您在哪個工作日時間方便？我們會電話回訪，請留意接聽2226開頭的座機來電～",
-    "ja": "平日のどのお時間がご都合よろしいでしょうか。こちらからお電話でご連絡しますので、2226で始まる固定電話からの着信にご注意ください。",
-    "ko": "평일 중 언제 통화가 편하신가요? 저희가 전화로 다시 연락드릴 예정이니 2226으로 시작하는 유선전화 수신에 유의해 주세요.",
-    "fr": "Quel créneau en semaine vous conviendrait le mieux ? Nous vous rappellerons par téléphone. Merci de prêter attention aux appels d’un numéro fixe commençant par 2226.",
-    "es": "¿Qué horario entre semana le resulta más conveniente? Le devolveremos la llamada, por favor esté atento a las llamadas de un teléfono fijo que comience por 2226.",
-    "ru": "В какое время в будний день вам будет удобно? Мы свяжемся с вами по телефону, пожалуйста, обратите внимание на звонок со стационарного номера, начинающегося на 2226.",
-}
 INVALID_CONTACT_PROMPTS = {
     "zh-CN": {
         "phone": "您提供的手机号格式似乎不太正确，麻烦您重新发送 11 位手机号，我再继续帮您安排。",
@@ -492,16 +517,6 @@ def _default_welcome_message_for(language: str | None) -> str:
     if language.startswith("zh"):
         return DEFAULT_WELCOME_MESSAGES["zh-CN"]
     return DEFAULT_WELCOME_MESSAGES["en"]
-
-
-def _manual_callback_prompt_for(language: str | None) -> str:
-    if not language:
-        return MANUAL_CALLBACK_PROMPTS["zh-CN"]
-    if language in MANUAL_CALLBACK_PROMPTS:
-        return MANUAL_CALLBACK_PROMPTS[language]
-    if language.startswith("zh"):
-        return MANUAL_CALLBACK_PROMPTS["zh-CN"]
-    return MANUAL_CALLBACK_PROMPTS["en"]
 
 
 def _invalid_contact_prompt_for(language: str | None, fields: set[str]) -> str:
@@ -1198,22 +1213,6 @@ async def _postprocess_parent_reply(
                     merged_info["campus"] = appointment_doc["campus"]
                 info_complete = _has_complete_profile(merged_info)
 
-        manual_prompt_inserted = False
-        if needs_manual_callback_flag and not profile_flags.get(MANUAL_PROMPT_SENT_FLAG):
-            profile_flags[MANUAL_PROMPT_SENT_FLAG] = True
-            manual_message = MessageSchema(
-                conversation_id=conversation.id,
-                sender_type="bot",
-                content=_manual_callback_prompt_for(locale),
-                metadata={
-                    "system_tag": "manual_callback_prompt",
-                    "assistant_id": conversation.assistant_id,
-                } if conversation.assistant_id else {"system_tag": "manual_callback_prompt"},
-            )
-            manual_result = await db.messages.insert_one(manual_message.model_dump())
-            manual_message.id = str(manual_result.inserted_id)
-            manual_prompt_inserted = True
-
         phone_value = merged_info.get("phone")
 
         current_time = datetime.utcnow()
@@ -1401,8 +1400,6 @@ async def _postprocess_parent_reply(
         ):
             logger.info("会话 %s 家长画像已完整，可推进开放日转化", conversation.id)
 
-        if manual_prompt_inserted:
-            logger.info("会话 %s 已补发人工回访提示消息", conversation.id)
     except Exception as exc:
         logger.error("会话 %s 后处理失败: %s", conversation_id, exc, exc_info=True)
 
@@ -1498,15 +1495,6 @@ async def create_conversation(
     if assistant and not assistant.get("is_active", True):
         raise HTTPException(status_code=400, detail="助手未启用")
     effective_school_id = request_data.school_id or (assistant.get("school_id") if assistant else None)
-    existing_lead = await _find_lead_for_ai_reply_scope(
-        db=db,
-        conversation_id="",
-        parent_id=str(parent_id),
-        school_id=effective_school_id,
-    )
-    initial_ai_reply_enabled = True
-    if existing_lead and "ai_reply_enabled" in existing_lead:
-        initial_ai_reply_enabled = bool(existing_lead.get("ai_reply_enabled", True))
 
     conversation_data = {
         "parent_id": parent_object_id,
@@ -1518,7 +1506,7 @@ async def create_conversation(
         "channel_appointment_logged": False,
         "school_id": effective_school_id,
         "assistant_id": assistant.get("id") if assistant else request_data.assistant_id,
-        "ai_reply_enabled": initial_ai_reply_enabled,
+        "ai_reply_enabled": True,
     }
     if channel_source:
         conversation_data["source_channel"] = channel_source
@@ -1936,12 +1924,6 @@ async def send_message(
     conversation_school_id = conv_dict.get("school_id")
     conversation_assistant_id = (conv_dict.get("assistant_id") or "").strip() or None
     ai_reply_enabled = bool(conv_dict.get("ai_reply_enabled", True))
-    lead_ai_scope = await _find_lead_for_ai_reply_scope(
-        db=db,
-        conversation_id=conversation_id,
-        parent_id=str(current_user.id),
-        school_id=conversation_school_id,
-    )
     request_assistant_id = (request.assistant_id or "").strip() or None
     effective_assistant_id = conversation_assistant_id or request_assistant_id
     assistant = await _load_assistant(db, effective_assistant_id)
@@ -1965,7 +1947,19 @@ async def send_message(
         conv_dict["updated_at"] = updated_at
         effective_assistant_id = request_assistant_id
         conversation_assistant_id = request_assistant_id
-    assistant_knowledge_base_id = assistant.get("knowledge_base_id") if assistant else None
+    assistant_knowledge_base_ids: list[str] = []
+    if assistant:
+        raw_knowledge_base_ids = assistant.get("knowledge_base_ids")
+        if isinstance(raw_knowledge_base_ids, list):
+            assistant_knowledge_base_ids = [
+                str(item).strip()
+                for item in raw_knowledge_base_ids
+                if str(item).strip()
+            ]
+        if not assistant_knowledge_base_ids:
+            legacy_knowledge_base_id = str(assistant.get("knowledge_base_id") or "").strip()
+            if legacy_knowledge_base_id:
+                assistant_knowledge_base_ids = [legacy_knowledge_base_id]
     request_school_id = (request.school_id or "").strip() or None
     effective_school_id = (
         conversation_school_id
@@ -2069,14 +2063,14 @@ async def send_message(
         full_answer = ""  # 累积完整答案
         
         try:
-            latest_conversation = await db.conversations.find_one({"_id": conv_id}, {"ai_reply_enabled": 1})
+            latest_conversation = await db.conversations.find_one(
+                {"_id": conv_id},
+                {"ai_reply_enabled": 1, "ai_reply_auto_resume_pending": 1, "ai_reply_disabled_at": 1, "_id": 1},
+            )
+            latest_conversation = await _ensure_ai_reply_auto_resumed(db, latest_conversation)
             latest_ai_reply_enabled = bool(
                 latest_conversation.get("ai_reply_enabled", ai_reply_enabled)
             ) if latest_conversation else ai_reply_enabled
-            if lead_ai_scope and "ai_reply_enabled" in lead_ai_scope:
-                latest_ai_reply_enabled = latest_ai_reply_enabled and bool(
-                    lead_ai_scope.get("ai_reply_enabled", True)
-                )
             if not latest_ai_reply_enabled:
                 yield f"data: {json.dumps({'event': 'ai_disabled'})}\n\n"
                 return
@@ -2093,7 +2087,7 @@ async def send_message(
                     request.content,
                     top_k=settings.CHROMA_TOP_K,
                     school_key=effective_school_id,
-                    knowledge_base_id=assistant_knowledge_base_id,
+                    knowledge_base_ids=assistant_knowledge_base_ids or None,
                 )
                 logger.info(
                     "知识库检索完成: conversation=%s effective_school_id=%s hits=%d query=%s",
@@ -2131,7 +2125,7 @@ async def send_message(
                 documents=retrieved_docs,
                 school_id=effective_school_id,
                 assistant_id=effective_assistant_id,
-                knowledge_base_id=assistant_knowledge_base_id,
+                knowledge_base_ids=assistant_knowledge_base_ids or None,
                 locale=request.language,
                 runtime_instructions=runtime_instructions,
             ):
@@ -2160,32 +2154,9 @@ async def send_message(
                 quick_transcript = _build_transcript_from_history(history, request.content, parsed_answer)
                 quick_profile_info = _fallback_extract_info(dict(profile_info), quick_transcript)
                 quick_profile_info, _ = _sanitize_contact_fields(quick_profile_info)
-                quick_manual_prompt_payload = None
-
                 if manual_callback_triggered or _needs_manual_callback(quick_profile_info):
                     profile_flags[MANUAL_CALLBACK_FLAG] = True
-                    if not profile_flags.get(MANUAL_PROMPT_SENT_FLAG):
-                        profile_flags[MANUAL_PROMPT_SENT_FLAG] = True
-                        localized_manual_prompt = _manual_callback_prompt_for(request.language)
-                        manual_message = MessageSchema(
-                            conversation_id=conversation.id,
-                            sender_type="bot",
-                            content=localized_manual_prompt,
-                            metadata={
-                                "system_tag": "manual_callback_prompt",
-                                "assistant_id": effective_assistant_id,
-                            } if effective_assistant_id else {"system_tag": "manual_callback_prompt"},
-                        )
-                        manual_result = await db.messages.insert_one(manual_message.model_dump())
-                        manual_message.id = str(manual_result.inserted_id)
-                        quick_manual_prompt_payload = {
-                            "id": manual_message.id,
-                            "content": localized_manual_prompt,
-                        }
-
                 bot_message_count_delta = 1
-                if quick_manual_prompt_payload:
-                    bot_message_count_delta += 1
                 current_time = datetime.utcnow()
                 await db.conversations.update_one(
                     {"_id": conv_id},
@@ -2197,10 +2168,6 @@ async def send_message(
                         }
                     },
                 )
-
-                if quick_manual_prompt_payload:
-                    await _save_conversation_profile(db, conv_id, quick_profile_info, profile_flags)
-                    yield f"data: {json.dumps({'event': 'manual_prompt', 'bot_message': quick_manual_prompt_payload})}\n\n"
 
                 yield f"data: {json.dumps({'event': 'done', 'bot_message': {'id': str(bot_message.id), 'content': parsed_answer}})}\n\n"
 

@@ -177,6 +177,7 @@ def search(
     bm25_weight: float = 0.3,
     school_key: str | None = None,
     knowledge_base_id: str | None = None,
+    knowledge_base_ids: list[str] | None = None,
     *,
     aggregate_parents: bool = True,
 ) -> list[dict[str, Any]]:
@@ -232,7 +233,12 @@ def search(
             strong_doc_ids.add(doc_id)
 
     sorted_items = sorted(combined.values(), key=lambda x: x.get("score", 0), reverse=True)
-    if knowledge_base_id:
+    allowed_knowledge_base_ids: set[str] = set()
+    if knowledge_base_ids:
+        allowed_knowledge_base_ids = {str(item).strip() for item in knowledge_base_ids if str(item).strip()}
+    elif knowledge_base_id:
+        allowed_knowledge_base_ids = {knowledge_base_id}
+    if allowed_knowledge_base_ids:
         filtered_items: list[dict[str, Any]] = []
         for item in sorted_items:
             metadata = _result_metadata(item)
@@ -241,7 +247,7 @@ def search(
                 or metadata.get("knowledge_base_id")
                 or ""
             )
-            if item_knowledge_base_id == knowledge_base_id:
+            if item_knowledge_base_id in allowed_knowledge_base_ids:
                 filtered_items.append(item)
         sorted_items = filtered_items
     if strong_doc_ids:

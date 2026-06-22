@@ -92,7 +92,7 @@ const menuItemsConfig: MenuItem[] = [
   { path: '/teacher/dashboard', labelKey: 'teacher.layout.menu.dashboard', icon: '📊' },
   { path: '/teacher/leads', labelKey: 'teacher.layout.menu.leads', icon: '📋' },
   { path: '/teacher/manual-callbacks', labelKey: 'teacher.layout.menu.manualCallbacks', icon: '⚠️' },
-  { path: '/teacher/knowledge-base', labelKey: 'teacher.layout.menu.knowledgeBase', icon: '📚', roles: ['school_admin'] },
+  { path: '/teacher/knowledge-base', labelKey: 'teacher.layout.menu.knowledgeBase', icon: '📚', roles: ['teacher', 'school_admin'] },
   { path: '/teacher/system-prompt', labelKey: 'teacher.layout.menu.systemPrompt', icon: '🧭', roles: ['school_admin', 'super_admin'] },
   { path: '/teacher/users', labelKey: 'teacher.layout.menu.userMgmt', icon: '👥', roles: ['school_admin', 'super_admin'] },
   { path: '/teacher/system-settings', labelKey: 'teacher.layout.menu.systemSettings', icon: '⚙️' },

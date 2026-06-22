@@ -6,12 +6,31 @@ import type { Lead, AddFollowUpNoteRequest } from '@/types';
 import type { Message } from '@/types/message'; // Assuming this exists
 
 export const useLeadDetailStore = defineStore('leadDetail', () => {
+  const MESSAGE_POLL_INTERVAL_MS = 2000;
   const lead = ref<Lead | null>(null);
   const messages = ref<Message[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
   const currentLanguage = ref<string | undefined>(undefined);
   const aiReplyEnabled = ref(true);
+  const pollingConversationId = ref<string | null>(null);
+  let messagePollingTimer: number | null = null;
+
+  function syncMessages(nextMessages: Message[]) {
+    const current = messages.value;
+    const unchanged = current.length === nextMessages.length && current.every((item, index) => {
+      const nextItem = nextMessages[index];
+      return (
+        item.id === nextItem?.id
+        && item.content === nextItem?.content
+        && item.sender_type === nextItem?.sender_type
+        && item.created_at === nextItem?.created_at
+      );
+    });
+    if (!unchanged) {
+      messages.value = nextMessages;
+    }
+  }
 
   async function fetchLead(id: string, language?: string) {
     currentLanguage.value = language;
@@ -30,16 +49,37 @@ export const useLeadDetailStore = defineStore('leadDetail', () => {
     loading.value = false;
   }
 
-  async function fetchMessages(conversationId: string) {
+  async function fetchMessages(conversationId: string, options?: { silent?: boolean }) {
     try {
-      // Assuming getConversationMessages is adapted for admin/teacher use
       const response = await getTeacherConversationMessages(conversationId, { page: 1, page_size: 200 });
-      messages.value = response.items;
+      syncMessages(response.items);
       aiReplyEnabled.value = response.ai_reply_enabled !== false;
     } catch (e) {
-      error.value = '无法加载对话记录';
+      if (!options?.silent) {
+        error.value = '无法加载对话记录';
+      }
       console.error(e);
     }
+  }
+
+  function stopMessagePolling() {
+    pollingConversationId.value = null;
+    if (messagePollingTimer !== null) {
+      window.clearInterval(messagePollingTimer);
+      messagePollingTimer = null;
+    }
+  }
+
+  function startMessagePolling(conversationId: string) {
+    if (!conversationId) return;
+    stopMessagePolling();
+    pollingConversationId.value = conversationId;
+    messagePollingTimer = window.setInterval(() => {
+      if (!pollingConversationId.value || document.hidden) {
+        return;
+      }
+      void fetchMessages(pollingConversationId.value, { silent: true });
+    }, MESSAGE_POLL_INTERVAL_MS);
   }
 
   async function addNote(id: string, note: AddFollowUpNoteRequest) {
@@ -93,10 +133,13 @@ export const useLeadDetailStore = defineStore('leadDetail', () => {
     error,
     aiReplyEnabled,
     fetchLead,
+    fetchMessages,
     addNote,
     updateNote,
     removeNote,
     sendManualReply,
     setAiReplyEnabled,
+    startMessagePolling,
+    stopMessagePolling,
   };
 });

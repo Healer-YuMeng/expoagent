@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Q
 from fastapi.responses import StreamingResponse
 
 from app.core.config import settings
-from app.core.dependencies import get_current_admin
+from app.core.dependencies import get_current_teacher
 from app.db import PostgresCompatDatabase, get_database
 from app.models.user import UserSchema
 from app.services.doc_ingest import DocIngestor
@@ -31,19 +31,25 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/docs", tags=["知识库文档"])
 
 
-def _require_school_admin(user: UserSchema) -> str:
-    if user.role != "school_admin":
-        raise HTTPException(status_code=403, detail="仅学校管理员可访问")
-    if not user.school_id:
-        raise HTTPException(status_code=400, detail="管理员未绑定学校，无法操作知识库")
-    return user.school_id
-
-
-def _resolve_admin_school(user: UserSchema, requested_school_id: Optional[str] = None) -> str:
+async def _resolve_teacher_school(
+    db: PostgresCompatDatabase,
+    user: UserSchema,
+    requested_school_id: Optional[str] = None,
+) -> str:
     if user.role == "school_admin":
         if not user.school_id:
             raise HTTPException(status_code=400, detail="管理员未绑定学校，无法操作知识库")
         return user.school_id
+    if user.role == "teacher":
+        if user.school_id:
+            return user.school_id
+        if not user.admin_id:
+            raise HTTPException(status_code=400, detail="老师未绑定学校管理员，无法操作知识库")
+        admin_doc = await db.users.find_one({"_id": user.admin_id}, {"school_id": 1})
+        school_id = str(admin_doc.get("school_id") or "").strip() if admin_doc else ""
+        if not school_id:
+            raise HTTPException(status_code=400, detail="老师所属学校未配置，无法操作知识库")
+        return school_id
     school_id = (requested_school_id or "").strip()
     if not school_id:
         raise HTTPException(status_code=400, detail="school_id 不能为空")
@@ -172,9 +178,9 @@ async def _ensure_retriever_ready(retriever: HybridRetriever, db: PostgresCompat
 async def list_knowledge_bases(
     school_id: Optional[str] = Query(default=None),
     db: PostgresCompatDatabase = Depends(get_database),
-    current_teacher: UserSchema = Depends(get_current_admin),
+    current_teacher: UserSchema = Depends(get_current_teacher),
 ):
-    school_id = _resolve_admin_school(current_teacher, school_id)
+    school_id = await _resolve_teacher_school(db, current_teacher, school_id)
     store = RagStore(db)
     knowledge_bases = await store.list_knowledge_bases(school_id=school_id)
     doc_counts = await store.count_docs_by_knowledge_base(school_id=school_id)
@@ -193,9 +199,9 @@ async def list_knowledge_bases(
 async def create_knowledge_base(
     payload: dict,
     db: PostgresCompatDatabase = Depends(get_database),
-    current_teacher: UserSchema = Depends(get_current_admin),
+    current_teacher: UserSchema = Depends(get_current_teacher),
 ):
-    school_id = _require_school_admin(current_teacher)
+    school_id = await _resolve_teacher_school(db, current_teacher, payload.get("school_id"))
     name = str(payload.get("name") or "").strip()
     description = str(payload.get("description") or "").strip() or None
     if not name:
@@ -227,10 +233,10 @@ async def upload_doc(
     use_async: bool = Query(True, description="是否异步处理"),
     knowledge_base_id: str = Form(...),
     file: UploadFile = File(...),
-    current_teacher: UserSchema = Depends(get_current_admin),
+    current_teacher: UserSchema = Depends(get_current_teacher),
     db: PostgresCompatDatabase = Depends(get_database),
 ):
-    school_id = _require_school_admin(current_teacher)
+    school_id = await _resolve_teacher_school(db, current_teacher)
     # 读取文件
     content = await file.read()
     storage = _get_storage()
@@ -326,9 +332,9 @@ async def list_docs(
     search: Optional[str] = Query(None),
     knowledge_base_id: Optional[str] = Query(None),
     db: PostgresCompatDatabase = Depends(get_database),
-    current_teacher: UserSchema = Depends(get_current_admin),
+    current_teacher: UserSchema = Depends(get_current_teacher),
 ):
-    school_id = _require_school_admin(current_teacher)
+    school_id = await _resolve_teacher_school(db, current_teacher)
     store = RagStore(db)
     docs = await store.list_docs(
         status=status_filter,
@@ -349,9 +355,9 @@ async def list_docs(
 async def get_doc_detail(
     doc_id: str,
     db: PostgresCompatDatabase = Depends(get_database),
-    current_teacher: UserSchema = Depends(get_current_admin),
+    current_teacher: UserSchema = Depends(get_current_teacher),
 ):
-    school_id = _require_school_admin(current_teacher)
+    school_id = await _resolve_teacher_school(db, current_teacher)
     store = RagStore(db)
     doc = await store.get_doc(doc_id)
     if not doc:
@@ -365,9 +371,9 @@ async def get_doc_detail(
 async def delete_doc(
     doc_id: str,
     db: PostgresCompatDatabase = Depends(get_database),
-    current_teacher: UserSchema = Depends(get_current_admin),
+    current_teacher: UserSchema = Depends(get_current_teacher),
 ):
-    school_id = _require_school_admin(current_teacher)
+    school_id = await _resolve_teacher_school(db, current_teacher)
     store = RagStore(db)
     doc = await store.get_doc(doc_id)
     if not doc:
@@ -402,9 +408,9 @@ async def delete_doc(
 async def list_doc_chunks(
     doc_id: str,
     db: PostgresCompatDatabase = Depends(get_database),
-    current_teacher: UserSchema = Depends(get_current_admin),
+    current_teacher: UserSchema = Depends(get_current_teacher),
 ):
-    school_id = _require_school_admin(current_teacher)
+    school_id = await _resolve_teacher_school(db, current_teacher)
     store = RagStore(db)
     doc = await store.get_doc(doc_id)
     if not doc:
@@ -420,9 +426,9 @@ async def add_doc_chunk(
     doc_id: str,
     payload: dict,
     db: PostgresCompatDatabase = Depends(get_database),
-    current_teacher: UserSchema = Depends(get_current_admin),
+    current_teacher: UserSchema = Depends(get_current_teacher),
 ):
-    school_id = _require_school_admin(current_teacher)
+    school_id = await _resolve_teacher_school(db, current_teacher)
     content = payload.get("content")
     if not content:
         raise HTTPException(status_code=400, detail="content 不能为空")
@@ -474,9 +480,9 @@ async def add_doc_chunk(
 async def upload_url(
     payload: dict,
     db: PostgresCompatDatabase = Depends(get_database),
-    current_teacher: UserSchema = Depends(get_current_admin),
+    current_teacher: UserSchema = Depends(get_current_teacher),
 ):
-    school_id = _require_school_admin(current_teacher)
+    school_id = await _resolve_teacher_school(db, current_teacher, payload.get("school_id"))
     url = (payload.get("url") or "").strip()
     knowledge_base_id = str(payload.get("knowledge_base_id") or "").strip()
     if not url:
@@ -565,9 +571,9 @@ async def update_chunk(
     chunk_id: str,
     payload: dict,
     db: PostgresCompatDatabase = Depends(get_database),
-    current_teacher: UserSchema = Depends(get_current_admin),
+    current_teacher: UserSchema = Depends(get_current_teacher),
 ):
-    school_id = _require_school_admin(current_teacher)
+    school_id = await _resolve_teacher_school(db, current_teacher)
     content = payload.get("content")
     metadata = payload.get("metadata")
     store = RagStore(db)
@@ -619,9 +625,9 @@ async def update_chunk(
 async def delete_chunk(
     chunk_id: str,
     db: PostgresCompatDatabase = Depends(get_database),
-    current_teacher: UserSchema = Depends(get_current_admin),
+    current_teacher: UserSchema = Depends(get_current_teacher),
 ):
-    school_id = _require_school_admin(current_teacher)
+    school_id = await _resolve_teacher_school(db, current_teacher)
     store = RagStore(db)
     chunk_doc = await store.get_chunk(chunk_id)
     if not chunk_doc:
@@ -643,9 +649,9 @@ async def delete_chunk(
 async def query_docs(
     payload: dict,
     db: PostgresCompatDatabase = Depends(get_database),
-    current_teacher: UserSchema = Depends(get_current_admin),
+    current_teacher: UserSchema = Depends(get_current_teacher),
 ):
-    school_id = _require_school_admin(current_teacher)
+    school_id = await _resolve_teacher_school(db, current_teacher, payload.get("school_id"))
     query = (payload.get("query") or "").strip()
     knowledge_base_id = str(payload.get("knowledge_base_id") or "").strip() or None
     if not query:
