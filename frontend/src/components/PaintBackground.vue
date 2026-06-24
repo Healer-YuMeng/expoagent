@@ -1,440 +1,141 @@
 <template>
-  <div class="paint-container">
-    <!-- 蓝色颜料滴 - 从上方流下 -->
-    <div 
-      v-for="i in blueDropCount" 
-      :key="`blue-${i}`"
-      :class="`paint-drop blue-${i}`"
-    ></div>
-    
-    <!-- 红色颜料滴 - 从下方流上 -->
-    <div 
-      v-for="i in redDropCount" 
-      :key="`red-${i}`"
-      :class="`paint-drop red-${i}`"
-    ></div>
+  <div class="paint-container" aria-hidden="true">
+    <div class="base-gradient"></div>
+    <div class="glow glow-primary"></div>
+    <div class="glow glow-secondary"></div>
+    <div class="glow glow-accent"></div>
+    <div class="texture texture-grid"></div>
+    <div class="texture texture-haze"></div>
   </div>
 </template>
 
-<script setup lang="ts">
-import { onMounted, ref } from 'vue';
-
-// 配置颜料滴数量
-const blueDropCount = ref(6);
-const redDropCount = ref(6);
-
-// 页面加载时随机化颜料块位置
-onMounted(() => {
-  randomizePaintDrops();
-});
-
-function randomizePaintDrops() {
-  // 获取所有蓝色颜料块
-  const blueDrops = document.querySelectorAll('[class*="blue-"]');
-  blueDrops.forEach(drop => {
-    const randomLeft = Math.random() * 80 + 10; // 10-90%
-    const randomTop = Math.random() * 40 - 20; // -20% 到 20%
-    (drop as HTMLElement).style.left = randomLeft + '%';
-    (drop as HTMLElement).style.top = randomTop + '%';
-    (drop as HTMLElement).style.right = 'auto';
-  });
-
-  // 获取所有红色颜料块
-  const redDrops = document.querySelectorAll('[class*="red-"]');
-  redDrops.forEach(drop => {
-    const randomLeft = Math.random() * 80 + 10; // 10-90%
-    const randomBottom = Math.random() * 40 - 20; // -20% 到 20%
-    (drop as HTMLElement).style.left = randomLeft + '%';
-    (drop as HTMLElement).style.bottom = randomBottom + '%';
-    (drop as HTMLElement).style.right = 'auto';
-    (drop as HTMLElement).style.top = 'auto';
-  });
-}
-</script>
-
 <style scoped>
-/* 颜料流动容器 */
 .paint-container {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
+  inset: 0;
   z-index: 1;
+  overflow: hidden;
   pointer-events: none;
-  background: linear-gradient(to bottom, 
-    rgba(255, 255, 255, 0) 0%, 
-    rgba(255, 255, 255, 0.25) 30%,
-    rgba(255, 255, 255, 0.9) 50%,
-    rgba(255, 255, 255, 0.25) 70%,
-    rgba(255, 255, 255, 0) 100%
-  );
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.96), transparent 30%),
+    linear-gradient(135deg, #f5f8fc 0%, #e8eff8 34%, #d6e2f0 100%);
 }
 
-/* 颜料滴基础样式 */
-.paint-drop {
+.base-gradient,
+.glow,
+.texture {
   position: absolute;
-  border-radius: 50%;
-  filter: blur(60px);
-  opacity: 0.7;
-  mix-blend-mode: multiply;
+  inset: 0;
 }
 
-/* ==================== 蓝色颜料滴 ==================== */
-.blue-1 {
-  width: 800px;
-  height: 600px;
-  background: radial-gradient(ellipse at center, 
-    rgba(0, 61, 143, 0.9) 0%, 
-    rgba(0, 61, 143, 0.7) 30%, 
-    rgba(0, 61, 143, 0.5) 50%,
-    transparent 80%);
-  top: -280px;
-  left: 5%;
-  animation: blueDrip1 25s ease-in-out infinite;
+.base-gradient {
+  background:
+    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.72), transparent 22%),
+    radial-gradient(circle at 78% 16%, rgba(88, 126, 184, 0.28), transparent 28%),
+    radial-gradient(circle at 15% 84%, rgba(179, 196, 219, 0.34), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(194, 208, 226, 0.18));
 }
 
-.blue-2 {
-  width: 350px;
-  height: 280px;
-  background: radial-gradient(ellipse at center, 
-    rgba(0, 61, 143, 0.85) 0%, 
-    rgba(0, 61, 143, 0.65) 30%, 
-    rgba(0, 61, 143, 0.45) 50%,
-    transparent 80%);
-  top: 10%;
-  right: 8%;
-  animation: blueDrip2 28s ease-in-out infinite;
+.glow {
+  border-radius: 999px;
+  filter: blur(72px);
+  opacity: 0.9;
 }
 
-.blue-3 {
-  width: 650px;
-  height: 480px;
-  background: radial-gradient(ellipse at center, 
-    rgba(0, 61, 143, 0.8) 0%, 
-    rgba(0, 61, 143, 0.6) 30%, 
-    rgba(0, 61, 143, 0.4) 50%,
-    transparent 80%);
-  top: 25%;
-  left: 65%;
-  animation: blueDrip3 32s ease-in-out infinite;
+.glow-primary {
+  top: -8%;
+  left: 46%;
+  width: 46vw;
+  height: 46vw;
+  min-width: 420px;
+  min-height: 420px;
+  background: radial-gradient(circle, rgba(88, 129, 193, 0.5) 0%, rgba(88, 129, 193, 0.22) 42%, transparent 74%);
+  animation: driftPrimary 20s ease-in-out infinite;
 }
 
-.blue-4 {
-  width: 420px;
-  height: 320px;
-  background: radial-gradient(ellipse at center, 
-    rgba(0, 61, 143, 0.75) 0%, 
-    rgba(0, 61, 143, 0.55) 30%, 
-    rgba(0, 61, 143, 0.35) 50%,
-    transparent 80%);
-  top: -150px;
-  left: 38%;
-  animation: blueDrip4 30s ease-in-out infinite;
+.glow-secondary {
+  top: 24%;
+  right: -10%;
+  width: 52vw;
+  height: 52vw;
+  min-width: 460px;
+  min-height: 460px;
+  background: radial-gradient(circle, rgba(55, 88, 142, 0.42) 0%, rgba(55, 88, 142, 0.18) 46%, transparent 78%);
+  animation: driftSecondary 24s ease-in-out infinite;
 }
 
-.blue-5 {
-  width: 280px;
-  height: 220px;
-  background: radial-gradient(ellipse at center, 
-    rgba(0, 61, 143, 0.8) 0%, 
-    rgba(0, 61, 143, 0.6) 30%, 
-    rgba(0, 61, 143, 0.4) 50%,
-    transparent 80%);
-  top: 15%;
-  left: 22%;
-  animation: blueDrip5 26s ease-in-out infinite;
+.glow-accent {
+  bottom: -16%;
+  left: -6%;
+  width: 42vw;
+  height: 42vw;
+  min-width: 360px;
+  min-height: 360px;
+  background: radial-gradient(circle, rgba(216, 226, 239, 0.96) 0%, rgba(216, 226, 239, 0.34) 48%, transparent 82%);
+  animation: driftAccent 26s ease-in-out infinite;
 }
 
-.blue-6 {
-  width: 950px;
-  height: 680px;
-  background: radial-gradient(ellipse at center, 
-    rgba(0, 61, 143, 0.85) 0%, 
-    rgba(0, 61, 143, 0.65) 30%, 
-    rgba(0, 61, 143, 0.45) 50%,
-    transparent 80%);
-  top: -320px;
-  right: 25%;
-  animation: blueDrip6 34s ease-in-out infinite;
+.texture-grid {
+  opacity: 0.28;
+  background-image:
+    linear-gradient(rgba(119, 141, 171, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(119, 141, 171, 0.08) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0));
 }
 
-/* ==================== 深红色颜料滴 ==================== */
-.red-1 {
-  width: 720px;
-  height: 550px;
-  background: radial-gradient(ellipse at center, 
-    rgba(180, 13, 76, 0.9) 0%, 
-    rgba(180, 13, 76, 0.7) 30%, 
-    rgba(180, 13, 76, 0.5) 50%,
-    transparent 80%);
-  bottom: -250px;
-  right: 3%;
-  animation: redDrip1 27s ease-in-out infinite;
+.texture-haze {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 28%),
+    linear-gradient(0deg, rgba(230, 236, 244, 0.2), transparent 34%);
 }
 
-.red-2 {
-  width: 380px;
-  height: 300px;
-  background: radial-gradient(ellipse at center, 
-    rgba(180, 13, 76, 0.85) 0%, 
-    rgba(180, 13, 76, 0.65) 30%, 
-    rgba(180, 13, 76, 0.45) 50%,
-    transparent 80%);
-  bottom: 8%;
-  left: 12%;
-  animation: redDrip2 29s ease-in-out infinite;
-}
-
-.red-3 {
-  width: 850px;
-  height: 620px;
-  background: radial-gradient(ellipse at center, 
-    rgba(180, 13, 76, 0.8) 0%, 
-    rgba(180, 13, 76, 0.6) 30%, 
-    rgba(180, 13, 76, 0.4) 50%,
-    transparent 80%);
-  bottom: 20%;
-  left: 58%;
-  animation: redDrip3 33s ease-in-out infinite;
-}
-
-.red-4 {
-  width: 450px;
-  height: 340px;
-  background: radial-gradient(ellipse at center, 
-    rgba(180, 13, 76, 0.75) 0%, 
-    rgba(180, 13, 76, 0.55) 30%, 
-    rgba(180, 13, 76, 0.35) 50%,
-    transparent 80%);
-  bottom: -180px;
-  right: 42%;
-  animation: redDrip4 31s ease-in-out infinite;
-}
-
-.red-5 {
-  width: 320px;
-  height: 260px;
-  background: radial-gradient(ellipse at center, 
-    rgba(180, 13, 76, 0.82) 0%, 
-    rgba(180, 13, 76, 0.62) 30%, 
-    rgba(180, 13, 76, 0.42) 50%,
-    transparent 80%);
-  bottom: 12%;
-  right: 28%;
-  animation: redDrip5 28s ease-in-out infinite;
-}
-
-.red-6 {
-  width: 920px;
-  height: 700px;
-  background: radial-gradient(ellipse at center, 
-    rgba(180, 13, 76, 0.88) 0%, 
-    rgba(180, 13, 76, 0.68) 30%, 
-    rgba(180, 13, 76, 0.48) 50%,
-    transparent 80%);
-  bottom: -280px;
-  left: 35%;
-  animation: redDrip6 35s ease-in-out infinite;
-}
-
-/* ==================== 蓝色颜料流动动画 ==================== */
-@keyframes blueDrip1 {
-  0%, 100% {
-    transform: translate(0, 0) rotate(0deg) scale(1);
-  }
-  25% {
-    transform: translate(-180px, 220px) rotate(12deg) scale(1.08);
+@keyframes driftPrimary {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
   }
   50% {
-    transform: translate(120px, 350px) rotate(-15deg) scale(1.15);
-  }
-  75% {
-    transform: translate(-80px, 180px) rotate(8deg) scale(1.05);
+    transform: translate3d(-4%, 5%, 0) scale(1.05);
   }
 }
 
-@keyframes blueDrip2 {
-  0%, 100% {
-    transform: translate(0, 0) rotate(0deg) scale(1);
-  }
-  20% {
-    transform: translate(-350px, -80px) rotate(-25deg) scale(1.2);
-  }
-  40% {
-    transform: translate(280px, 150px) rotate(18deg) scale(0.95);
-  }
-  60% {
-    transform: translate(-180px, 80px) rotate(-12deg) scale(1.15);
-  }
-  80% {
-    transform: translate(220px, -50px) rotate(22deg) scale(1.08);
-  }
-}
-
-@keyframes blueDrip3 {
-  0%, 100% {
-    transform: translate(0, 0) rotate(0deg) scale(1);
-  }
-  30% {
-    transform: translate(-220px, -120px) rotate(16deg) scale(1.1);
-  }
-  60% {
-    transform: translate(180px, 200px) rotate(-20deg) scale(1.12);
-  }
-}
-
-@keyframes blueDrip4 {
-  0%, 100% {
-    transform: translate(0, 0) rotate(0deg) scale(1);
-  }
-  15% {
-    transform: translate(320px, 180px) rotate(-28deg) scale(1.25);
-  }
-  35% {
-    transform: translate(-280px, -120px) rotate(15deg) scale(0.92);
-  }
-  55% {
-    transform: translate(180px, 250px) rotate(-18deg) scale(1.18);
-  }
-  75% {
-    transform: translate(-150px, 80px) rotate(20deg) scale(1.05);
-  }
-}
-
-@keyframes blueDrip5 {
-  0%, 100% {
-    transform: translate(0, 0) rotate(0deg) scale(1);
-  }
-  16% {
-    transform: translate(420px, -90px) rotate(32deg) scale(1.3);
-  }
-  36% {
-    transform: translate(-180px, 200px) rotate(-24deg) scale(0.85);
-  }
-  56% {
-    transform: translate(320px, 120px) rotate(28deg) scale(1.22);
-  }
-  76% {
-    transform: translate(-220px, -50px) rotate(-20deg) scale(0.95);
-  }
-}
-
-@keyframes blueDrip6 {
-  0%, 100% {
-    transform: translate(0, 0) rotate(0deg) scale(1);
-  }
-  28% {
-    transform: translate(-200px, 280px) rotate(14deg) scale(1.08);
-  }
-  56% {
-    transform: translate(150px, 180px) rotate(-18deg) scale(1.12);
-  }
-}
-
-/* ==================== 红色颜料流动动画 ==================== */
-@keyframes redDrip1 {
-  0%, 100% {
-    transform: translate(0, 0) rotate(0deg) scale(1);
-  }
-  30% {
-    transform: translate(150px, -250px) rotate(-16deg) scale(1.1);
-  }
-  60% {
-    transform: translate(-120px, -180px) rotate(14deg) scale(1.12);
-  }
-}
-
-@keyframes redDrip2 {
-  0%, 100% {
-    transform: translate(0, 0) rotate(0deg) scale(1);
-  }
-  18% {
-    transform: translate(380px, 120px) rotate(26deg) scale(1.22);
-  }
-  38% {
-    transform: translate(-220px, -150px) rotate(-18deg) scale(0.93);
-  }
-  58% {
-    transform: translate(280px, 80px) rotate(20deg) scale(1.18);
-  }
-  78% {
-    transform: translate(-180px, -80px) rotate(-15deg) scale(1.08);
-  }
-}
-
-@keyframes redDrip3 {
-  0%, 100% {
-    transform: translate(0, 0) rotate(0deg) scale(1);
-  }
-  25% {
-    transform: translate(-200px, 150px) rotate(18deg) scale(1.08);
+@keyframes driftSecondary {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
   }
   50% {
-    transform: translate(180px, -220px) rotate(-22deg) scale(1.14);
-  }
-  75% {
-    transform: translate(-100px, -120px) rotate(12deg) scale(1.06);
+    transform: translate3d(-5%, -4%, 0) scale(1.04);
   }
 }
 
-@keyframes redDrip4 {
-  0%, 100% {
-    transform: translate(0, 0) rotate(0deg) scale(1);
+@keyframes driftAccent {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
   }
-  22% {
-    transform: translate(-350px, -100px) rotate(-30deg) scale(1.28);
-  }
-  44% {
-    transform: translate(250px, 180px) rotate(22deg) scale(0.88);
-  }
-  66% {
-    transform: translate(-280px, -180px) rotate(-25deg) scale(1.2);
-  }
-  88% {
-    transform: translate(180px, 100px) rotate(18deg) scale(1.1);
+  50% {
+    transform: translate3d(5%, -3%, 0) scale(1.03);
   }
 }
 
-@keyframes redDrip5 {
-  0%, 100% {
-    transform: translate(0, 0) rotate(0deg) scale(1);
-  }
-  20% {
-    transform: translate(-380px, 100px) rotate(-28deg) scale(1.26);
-  }
-  40% {
-    transform: translate(280px, -180px) rotate(22deg) scale(0.9);
-  }
-  60% {
-    transform: translate(-250px, 150px) rotate(-24deg) scale(1.2);
-  }
-  80% {
-    transform: translate(200px, -100px) rotate(18deg) scale(1.05);
-  }
-}
-
-@keyframes redDrip6 {
-  0%, 100% {
-    transform: translate(0, 0) rotate(0deg) scale(1);
-  }
-  26% {
-    transform: translate(180px, -200px) rotate(15deg) scale(1.1);
-  }
-  52% {
-    transform: translate(-150px, -280px) rotate(-20deg) scale(1.14);
-  }
-  78% {
-    transform: translate(120px, -180px) rotate(12deg) scale(1.06);
-  }
-}
-
-/* ==================== 响应式设计 ==================== */
 @media (max-width: 768px) {
-  .paint-drop {
-    filter: blur(40px);
+  .glow {
+    filter: blur(56px);
+  }
+
+  .texture-grid {
+    background-size: 44px 44px;
+    opacity: 0.2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glow-primary,
+  .glow-secondary,
+  .glow-accent {
+    animation: none;
   }
 }
 </style>
-

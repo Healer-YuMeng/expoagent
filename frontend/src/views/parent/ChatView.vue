@@ -5,7 +5,11 @@
     <div class="chat-shell">
       <header class="chat-topbar">
         <div class="topbar-brand">
-          <strong>{{ t('chat.title') }}</strong>
+          <span class="brand-status-dot" aria-hidden="true"></span>
+          <div class="brand-copy">
+            <strong>在线聊天</strong>
+            <span class="brand-status-text">系统在线</span>
+          </div>
         </div>
         <div class="topbar-actions">
           <button class="topbar-link" type="button" @click="handleGoHome">
@@ -18,11 +22,6 @@
       </header>
 
       <main class="chat-panel">
-        <section class="chat-heading">
-          <h1>{{ t('chat.myConsultation') }}</h1>
-          <p>{{ t('chat.subtitle') }}</p>
-        </section>
-
         <section ref="messagesContainerRef" class="message-stream">
           <article
             v-for="message in displayedMessages"
@@ -104,48 +103,49 @@
             </div>
           </article>
         </section>
+      </main>
 
-        <footer class="composer">
-          <div v-if="assistantOptions.length" class="assistant-bar">
-            <div class="assistant-copy">
-              <span class="assistant-label">当前助手</span>
-              <span class="assistant-tip">仅使用该助手绑定的知识库和提示词回答</span>
-            </div>
-            <div class="assistant-pills">
-              <button
-                v-for="assistant in assistantOptions"
-                :key="assistant.id"
-                type="button"
-                class="assistant-pill"
-                :class="{ active: selectedAssistantId === assistant.id }"
-                :disabled="isSending || isSwitchingAssistant"
-                @click="handleAssistantSelect(assistant.id)"
-              >
-                {{ assistant.name }}
-              </button>
-            </div>
+      <footer class="composer composer-floating">
+        <div v-if="assistantOptions.length" class="assistant-bar">
+          <div class="assistant-copy">
+            <span class="assistant-label">当前助手</span>
+            <span class="assistant-tip">仅使用该助手绑定的知识库和提示词回答</span>
           </div>
-
-          <div class="composer-inner">
-            <input
-              v-model="newMessage"
-              type="text"
-              class="composer-input"
-              :placeholder="t('chat.inputPlaceholder')"
-              :disabled="isSending"
-              @keyup.enter="handleSendMessage"
-            />
+          <div class="assistant-pills">
             <button
+              v-for="assistant in assistantOptions"
+              :key="assistant.id"
               type="button"
-              class="composer-send"
-              :disabled="isSending"
-              @click="handleSendMessage"
+              class="assistant-pill"
+              :class="{ active: selectedAssistantId === assistant.id }"
+              :disabled="isSending || isSwitchingAssistant"
+              @click="handleAssistantSelect(assistant.id)"
             >
-              {{ isSending ? t('common.sending') : t('common.send') }}
+              {{ assistant.name }}
             </button>
           </div>
-        </footer>
-      </main>
+        </div>
+
+        <div class="composer-inner">
+          <input
+            v-model="newMessage"
+            type="text"
+            class="composer-input"
+            :placeholder="t('chat.inputPlaceholder')"
+            :disabled="isSending"
+            @keyup.enter="handleSendMessage"
+          />
+          <button
+            type="button"
+            class="composer-send"
+            :aria-label="isSending ? t('common.sending') : t('common.send')"
+            :disabled="isSending"
+            @click="handleSendMessage"
+          >
+            <span class="composer-send-icon" aria-hidden="true">↑</span>
+          </button>
+        </div>
+      </footer>
     </div>
   </div>
 </template>
@@ -413,14 +413,14 @@ watch(
 }
 
 .chat-shell {
-  --chat-shell-width: min(100%, 1240px);
+  --chat-shell-width: min(100%, 1100px);
   position: relative;
   z-index: 10;
   height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 46px 22px 22px;
+  padding: 24px 16px 18px;
   box-sizing: border-box;
 }
 
@@ -429,21 +429,21 @@ watch(
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 22px;
-  padding: 21px 40px;
+  margin-bottom: 14px;
+  padding: 14px 22px;
   border-radius: 999px;
-  background: rgba(246, 248, 255, 0.28);
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(249, 251, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 18px 42px rgba(53, 62, 93, 0.12);
+  box-shadow: 0 12px 28px rgba(53, 62, 93, 0.1);
 }
 
 .topbar-link {
   border: 0;
   background: transparent;
   color: rgba(48, 63, 90, 0.88);
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -451,62 +451,74 @@ watch(
 .topbar-actions {
   display: flex;
   align-items: center;
-  gap: 34px;
+  gap: 20px;
 }
 
 .topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   color: #334560;
 }
 
+.brand-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
 .topbar-brand strong {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
+  line-height: 1.1;
+}
+
+.brand-status-text {
+  color: rgba(66, 86, 118, 0.72);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.brand-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #35c759;
+  box-shadow:
+    0 0 0 0 rgba(53, 199, 89, 0.45),
+    0 0 18px rgba(53, 199, 89, 0.45);
+  animation: onlinePulse 1.6s ease-out infinite;
 }
 
 .chat-panel {
   width: var(--chat-shell-width);
   flex: 0 0 auto;
   min-height: 0;
-  height: min(820px, calc(100vh - 160px));
+  height: min(740px, calc(100vh - 198px));
   display: flex;
   flex-direction: column;
-  border-radius: 34px;
-  background: linear-gradient(180deg, rgba(244, 247, 255, 0.46), rgba(241, 222, 233, 0.36));
-  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 30px;
+  background: rgba(252, 253, 255, 0.9);
+  border: 1px solid rgba(220, 228, 239, 0.82);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 26px 64px rgba(52, 57, 77, 0.14);
+  box-shadow:
+    0 24px 60px rgba(52, 57, 77, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
   overflow: hidden;
-}
-
-.chat-heading {
-  padding: 28px 34px 22px;
-  background: rgba(246, 248, 255, 0.32);
-  border-bottom: 1px solid rgba(224, 229, 240, 0.86);
-}
-
-.chat-heading h1 {
-  margin: 0 0 8px;
-  color: #31445f;
-  font-size: 22px;
-  font-weight: 700;
-}
-
-.chat-heading p {
-  margin: 0;
-  color: rgba(70, 84, 108, 0.8);
-  font-size: 14px;
 }
 
 .message-stream {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 28px 34px;
+  padding: 26px 26px 18px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  background: linear-gradient(180deg, rgba(214, 223, 244, 0.24), rgba(228, 194, 213, 0.24));
+  gap: 14px;
+  background:
+    radial-gradient(circle at 50% 22%, rgba(226, 235, 248, 0.34), transparent 44%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(247, 250, 255, 0.72));
 }
 
 .message-stream::-webkit-scrollbar {
@@ -520,9 +532,10 @@ watch(
 
 .message-row {
   display: flex;
-  gap: 14px;
+  gap: 10px;
   width: 100%;
   max-width: none;
+  align-items: flex-end;
 }
 
 .message-row.is-user {
@@ -531,10 +544,10 @@ watch(
 }
 
 .message-avatar {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 999px;
-  flex: 0 0 40px;
+  flex: 0 0 36px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -557,7 +570,7 @@ watch(
 }
 
 .user-avatar-icon {
-  font-size: 19px;
+  font-size: 17px;
   line-height: 1;
 }
 
@@ -565,11 +578,11 @@ watch(
   flex: 0 0 auto;
   width: fit-content;
   min-width: 0;
-  max-width: min(68%, 840px);
-  padding: 14px 20px;
+  max-width: min(70%, 720px);
+  padding: 12px 16px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 10px 26px rgba(53, 64, 92, 0.07);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 10px 28px rgba(53, 64, 92, 0.06);
   border: 1px solid rgba(236, 239, 245, 0.96);
 }
 
@@ -578,8 +591,9 @@ watch(
 }
 
 .message-row.is-user .message-bubble {
-  background: rgba(255, 255, 255, 0.9);
+  background: linear-gradient(180deg, rgba(242, 246, 255, 0.98), rgba(235, 241, 251, 0.96));
   text-align: left;
+  border-color: rgba(209, 221, 240, 0.98);
 }
 
 .message-text {
@@ -587,8 +601,8 @@ watch(
   white-space: pre-wrap;
   word-break: break-word;
   color: #2d3c57;
-  font-size: 17px;
-  line-height: 1.58;
+  font-size: 15px;
+  line-height: 1.6;
 }
 
 .typing-indicator {
@@ -678,9 +692,14 @@ watch(
 }
 
 .composer {
-  padding: 22px 34px 26px;
-  border-top: 1px solid rgba(224, 229, 240, 0.86);
-  background: rgba(248, 243, 247, 0.28);
+  width: var(--chat-shell-width);
+  margin-top: 14px;
+  padding: 0;
+  background: transparent;
+}
+
+.composer-floating {
+  flex: 0 0 auto;
 }
 
 .assistant-bar {
@@ -688,7 +707,7 @@ watch(
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .assistant-copy {
@@ -718,17 +737,17 @@ watch(
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
   max-width: 70%;
 }
 
 .assistant-pill {
   border: 1px solid rgba(166, 181, 214, 0.75);
   border-radius: 999px;
-  padding: 10px 16px;
+  padding: 8px 14px;
   background: rgba(255, 255, 255, 0.92);
   color: #30425e;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
@@ -748,7 +767,14 @@ watch(
 .composer-inner {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(225, 232, 242, 0.96);
+  box-shadow:
+    0 18px 36px rgba(55, 68, 96, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
 }
 
 .composer-input {
@@ -757,14 +783,14 @@ watch(
   border: 0;
   outline: 0;
   background: transparent;
-  min-height: 54px;
-  padding: 0 24px;
+  min-height: 58px;
+  padding: 0 18px;
   color: #26354e;
-  font-size: 16px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(232, 236, 243, 0.96);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  font-size: 15px;
+  border-radius: 16px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .composer-input::placeholder {
@@ -772,29 +798,57 @@ watch(
 }
 
 .composer-send {
-  border: 1px solid rgba(198, 204, 217, 0.9);
-  min-width: 112px;
-  min-height: 56px;
-  padding: 0 24px;
+  border: 0;
+  min-width: 52px;
+  min-height: 52px;
+  padding: 0;
   border-radius: 999px;
-  color: #2b3d57;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(241, 243, 248, 0.96));
-  font-size: 16px;
+  color: #ffffff;
+  background: linear-gradient(180deg, #adc2ff, #96aff8);
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 8px 20px rgba(58, 70, 94, 0.08);
+  box-shadow: 0 12px 24px rgba(120, 146, 221, 0.28);
 }
 
 .composer-send:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 24px rgba(58, 70, 94, 0.12);
+  box-shadow: 0 16px 28px rgba(120, 146, 221, 0.36);
 }
 
 .composer-send:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+}
+
+.composer-send-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 24px;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+@keyframes onlinePulse {
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(53, 199, 89, 0.38),
+      0 0 12px rgba(53, 199, 89, 0.32);
+  }
+  70% {
+    box-shadow:
+      0 0 0 10px rgba(53, 199, 89, 0),
+      0 0 18px rgba(53, 199, 89, 0.22);
+  }
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(53, 199, 89, 0),
+      0 0 12px rgba(53, 199, 89, 0.18);
+  }
 }
 
 @keyframes pulse {
@@ -818,85 +872,109 @@ watch(
 
 @media (max-width: 768px) {
   .chat-shell {
-    padding: 18px 14px 14px;
+    padding: 10px 10px 8px;
   }
 
   .chat-topbar {
-    padding: 16px 20px;
-    border-radius: 22px;
+    margin-bottom: 10px;
+    padding: 12px 14px;
+    border-radius: 18px;
   }
 
   .topbar-brand strong {
-    font-size: 16px;
+    font-size: 15px;
+  }
+
+  .brand-status-text {
+    font-size: 11px;
   }
 
   .topbar-actions {
-    gap: 18px;
+    gap: 14px;
+  }
+
+  .topbar-link {
+    font-size: 14px;
   }
 
   .chat-panel {
-    border-radius: 24px;
+    border-radius: 22px;
     width: 100%;
-    height: calc(100vh - 122px);
-  }
-
-  .chat-heading {
-    padding: 22px 20px 18px;
-  }
-
-  .chat-heading h1 {
-    font-size: 20px;
+    height: calc(100vh - 154px);
   }
 
   .message-stream {
-    padding: 22px 20px;
+    padding: 14px 14px 10px;
   }
 
   .message-row {
     max-width: 100%;
   }
 
+  .message-avatar {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+
   .message-bubble {
     width: fit-content;
-    max-width: calc(100% - 62px);
-    padding: 12px 15px;
+    max-width: calc(100% - 44px);
+    padding: 10px 13px;
   }
 
   .message-row.is-user .message-bubble {
-    max-width: calc(100% - 62px);
+    max-width: calc(100% - 44px);
+  }
+
+  .message-text {
+    font-size: 14px;
   }
 
   .composer {
-    padding: 18px 20px 22px;
+    width: 100%;
+    margin-top: 10px;
+    padding-bottom: calc(4px + env(safe-area-inset-bottom));
   }
 
   .assistant-bar {
     flex-direction: column;
     align-items: stretch;
+    gap: 10px;
   }
 
   .assistant-pills {
     max-width: 100%;
     justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
   }
 
   .composer-inner {
     align-items: center;
     flex-direction: row;
-    gap: 12px;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 20px;
   }
 
   .composer-input {
-    min-height: 52px;
-    padding: 0 18px;
+    min-height: 48px;
+    padding: 0 10px;
+    border-radius: 16px;
   }
 
   .composer-send {
     width: auto;
     flex: 0 0 auto;
-    min-width: 96px;
-    min-height: 52px;
-    padding: 0 18px;
+    min-width: 46px;
+    min-height: 46px;
+    border-radius: 999px;
+  }
+
+  .composer-send-icon {
+    font-size: 20px;
   }
 }
 </style>

@@ -64,8 +64,8 @@ class Settings(BaseSettings):
     FRONTEND_IMAGE_TAG: str = "latest"
     BACKEND_PULL_POLICY: str = "always"
     FRONTEND_PULL_POLICY: str = "always"
-    BACKEND_HOST_PORT: int = 9008
-    FRONTEND_HOST_PORT: int = 8006
+    BACKEND_HOST_PORT: int = 9608
+    FRONTEND_HOST_PORT: int = 8606
     MINIO_API_PORT: int = 9003
     MINIO_CONSOLE_PORT: int = 9004
 
@@ -140,7 +140,7 @@ class Settings(BaseSettings):
     BACKEND_HOST: str = "127.0.0.1"
     
     # 服务监听端口
-    BACKEND_PORT: int = 9008
+    BACKEND_PORT: int = 9608
 
     # ========== JWT 认证配置 ==========
     # ⚠️ JWT 密钥 - 生产环境必须使用随机生成的密钥！
@@ -156,8 +156,8 @@ class Settings(BaseSettings):
     # ========== CORS 配置 ==========
     # 允许的跨域来源（支持 JSON 数组字符串或 Python List）
     CORS_ORIGINS: List[str] | str = [
-        "http://localhost:8006",
-        "http://127.0.0.1:8006",
+        "http://localhost:8606",
+        "http://127.0.0.1:8606",
     ]
 
     # ========== 企业微信配置 ==========
@@ -299,9 +299,6 @@ class Settings(BaseSettings):
             warnings.append("⚠️  ANTHROPIC_API_KEY 未设置，无法调用 Anthropic 兼容接口")
         if self.LLM_PROVIDER not in {"openai", "ollama", "qwen", "anthropic"}:
             warnings.append(f"⚠️  不支持的 LLM_PROVIDER: {self.LLM_PROVIDER}")
-        
-        if not self.SMTP_USER or not self.SMTP_PASSWORD:
-            warnings.append("⚠️  SMTP_USER 或 SMTP_PASSWORD 未设置，邮件功能将无法使用")
         
         # 检查 DEBUG 模式
         if not self.DEBUG and self.LOG_LEVEL == "DEBUG":
