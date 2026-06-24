@@ -22,7 +22,6 @@ print(settings.BACKEND_PORT or 8000)
 PY
 )"
 
-PORT="${PORT:-9008}"
 RELOAD_ARGS=()
 if [[ "${BACKEND_RELOAD:-1}" != "0" ]]; then
   RELOAD_ARGS+=(--reload)
