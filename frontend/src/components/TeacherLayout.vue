@@ -1,22 +1,16 @@
 <template>
   <div class="teacher-layout">
-    <!-- 颜料流动背景 -->
-    <PaintBackground />
-
-    <!-- 侧边栏 -->
-    <aside class="sidebar glass">
-      <!-- Logo区域 -->
+    <aside class="sidebar">
       <div class="sidebar-header">
-        <div class="logo">
-          <div class="logo-icon">🎓</div>
-          <div class="logo-text">
-            <div class="logo-title">{{ t('teacher.layout.logo') }}</div>
-            <div class="logo-subtitle">{{ t('teacher.layout.subtitle') }}</div>
-          </div>
+        <div class="brand-mark" aria-hidden="true">
+          <img class="brand-logo" :src="expoHallLogo" alt="" />
+        </div>
+        <div class="brand-copy">
+          <div class="logo-title">{{ t('teacher.layout.logo') }}</div>
+          <div class="logo-subtitle">{{ t('teacher.layout.subtitle') }}</div>
         </div>
       </div>
 
-      <!-- 导航菜单 -->
       <nav class="nav-menu">
         <router-link
           v-for="item in menuItems"
@@ -25,46 +19,61 @@
           class="nav-item"
           :class="{ active: isActive(item.path) }"
         >
-          <div class="nav-icon">{{ item.icon }}</div>
+          <span class="nav-active-bar" aria-hidden="true"></span>
+          <el-icon class="nav-icon">
+            <component :is="item.icon" />
+          </el-icon>
           <span class="nav-label">{{ item.label }}</span>
         </router-link>
       </nav>
 
-      <!-- 用户信息栏 -->
       <div class="sidebar-footer">
-        <!-- 语言切换按钮 -->
         <button class="language-btn" @click="toggleLanguage" :title="t('teacher.layout.language')">
-          <span class="language-icon">🌐</span>
+          <el-icon class="language-icon"><Promotion /></el-icon>
           <span class="language-text">{{ locale === 'zh-CN' ? 'EN' : '中' }}</span>
         </button>
-        
+
         <div class="user-info">
-          <div class="user-avatar">👤</div>
+          <div class="user-avatar" aria-hidden="true">
+            <el-icon><UserFilled /></el-icon>
+          </div>
           <div class="user-details">
             <div class="user-name">{{ displayUserName }}</div>
             <div class="user-role">
               {{
                 authStore.userRole === 'super_admin'
                   ? t('teacher.layout.userRoleSuper')
-                  : authStore.userRole === 'school_admin'
+                  : authStore.userRole === 'admin'
                     ? t('teacher.layout.userRoleAdmin')
                     : t('teacher.layout.userRole')
               }}
             </div>
           </div>
         </div>
+
         <button class="logout-btn" @click="handleLogout" :title="t('teacher.layout.logout')">
-          <span class="logout-icon">🚪</span>
+          <el-icon class="logout-icon"><SwitchButton /></el-icon>
           <span class="logout-text">{{ t('teacher.layout.logout') }}</span>
         </button>
       </div>
     </aside>
 
-    <!-- 主内容区 -->
     <div class="main-wrapper">
-      <!-- 内容区 -->
-      <main class="content-area">
-        <router-view />
+      <main class="content-area" :class="{ 'content-area--locked': isFeatureLocked }">
+        <div class="content-shell" :class="{ 'content-shell--locked': isFeatureLocked }">
+          <router-view />
+          <div
+            v-if="isFeatureLocked"
+            class="feature-lock-overlay"
+            @wheel.prevent
+            @touchmove.prevent
+          >
+            <div class="feature-lock-card">
+              <div class="feature-lock-title">{{ t('teacher.layout.featureLockedTitle') }}</div>
+              <div class="feature-lock-desc">{{ t('teacher.layout.featureLockedDesc') }}</div>
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   </div>
@@ -72,10 +81,28 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import type { Component } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
+import {
+  Collection,
+  DataAnalysis,
+  Document,
+  MessageBox,
+  Promotion,
+  Setting,
+  SwitchButton,
+  User,
+  UserFilled,
+  Warning,
+} from '@element-plus/icons-vue';
 import { useAuthStore } from '@/stores/auth';
-import PaintBackground from './PaintBackground.vue';
+import {
+  getPortalPath,
+  isPortalMenuPathActive,
+  isSchoolAdminFeatureLocked,
+} from '@/router/portalRoutes';
+import expoHallLogo from '@/assets/expo-hall-logo.png';
 
 const route = useRoute();
 const authStore = useAuthStore();
@@ -84,30 +111,31 @@ const { t, locale } = useI18n();
 interface MenuItem {
   path: string;
   labelKey: string;
-  icon: string;
-  roles?: Array<'teacher' | 'school_admin' | 'super_admin'>;
+  icon: Component;
+  roles?: Array<'sales' | 'admin' | 'super_admin'>;
 }
 
-const menuItemsConfig: MenuItem[] = [
-  { path: '/teacher/dashboard', labelKey: 'teacher.layout.menu.dashboard', icon: '📊' },
-  { path: '/teacher/leads', labelKey: 'teacher.layout.menu.leads', icon: '📋' },
-  { path: '/teacher/manual-callbacks', labelKey: 'teacher.layout.menu.manualCallbacks', icon: '⚠️' },
-  { path: '/teacher/knowledge-base', labelKey: 'teacher.layout.menu.knowledgeBase', icon: '📚', roles: ['teacher', 'school_admin'] },
-  { path: '/teacher/system-prompt', labelKey: 'teacher.layout.menu.systemPrompt', icon: '🧭', roles: ['school_admin', 'super_admin'] },
-  { path: '/teacher/users', labelKey: 'teacher.layout.menu.userMgmt', icon: '👥', roles: ['school_admin', 'super_admin'] },
-  { path: '/teacher/system-settings', labelKey: 'teacher.layout.menu.systemSettings', icon: '⚙️' },
+const menuItemsConfig: Array<Omit<MenuItem, 'path'> & { target: 'dashboard' | 'leads' | 'manualCallbacks' | 'knowledgeBase' | 'systemPrompt' | 'userManagement' | 'systemSettings' }> = [
+  { target: 'dashboard', labelKey: 'teacher.layout.menu.dashboard', icon: DataAnalysis },
+  { target: 'leads', labelKey: 'teacher.layout.menu.leads', icon: Document },
+  { target: 'manualCallbacks', labelKey: 'teacher.layout.menu.manualCallbacks', icon: Warning },
+  { target: 'knowledgeBase', labelKey: 'teacher.layout.menu.knowledgeBase', icon: Collection, roles: ['sales', 'admin'] },
+  { target: 'systemPrompt', labelKey: 'teacher.layout.menu.systemPrompt', icon: MessageBox, roles: ['admin', 'super_admin'] },
+  { target: 'userManagement', labelKey: 'teacher.layout.menu.userMgmt', icon: User, roles: ['admin', 'super_admin'] },
+  { target: 'systemSettings', labelKey: 'teacher.layout.menu.systemSettings', icon: Setting },
 ];
 
-const menuItems = computed(() => 
+const menuItems = computed(() =>
   menuItemsConfig
-    .filter(item => {
+    .filter((item) => {
       const role = authStore.userRole;
       if (!item.roles) return true;
       return role ? item.roles.includes(role as any) : false;
     })
-    .map(item => ({
+    .map((item) => ({
       ...item,
-      label: t(item.labelKey)
+      path: getPortalPath(authStore.userRole, item.target),
+      label: t(item.labelKey),
     }))
 );
 
@@ -116,7 +144,7 @@ const displayUserName = computed(() => {
   if (!name) {
     return '13800000002';
   }
-  if (name === '默认学校管理员' || name === 'Default School Admin') {
+  if (name === '默认学校管理员' || name === '默认普通管理员' || name === 'Default School Admin' || name === 'Default Admin') {
     return t('teacher.layout.defaultSchoolAdmin');
   }
   if (name === '默认超级管理员' || name === 'Default Super Admin') {
@@ -125,9 +153,8 @@ const displayUserName = computed(() => {
   return name;
 });
 
-const isActive = (path: string) => {
-  return route.path === path || route.path.startsWith(path + '/');
-};
+const isActive = (path: string) => isPortalMenuPathActive(route.path, path);
+const isFeatureLocked = computed(() => isSchoolAdminFeatureLocked(authStore.userRole, route.path));
 
 const handleLogout = () => {
   authStore.logout();
@@ -141,409 +168,402 @@ const toggleLanguage = () => {
 
 <style scoped>
 .teacher-layout {
+  position: relative;
   display: flex;
   min-height: 100vh;
-  position: relative;
   overflow: hidden;
+  background: #f6f7f9;
 }
 
-/* 毛玻璃效果 */
-.glass {
-  background: rgba(255, 255, 255, 0.25);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
-}
-
-/* 侧边栏 */
 .sidebar {
-  width: 260px;
   position: fixed;
-  left: 20px;
-  top: 20px;
-  bottom: 20px;
-  border-radius: 25px;
-  display: flex;
-  flex-direction: column;
+  top: 18px;
+  left: 18px;
+  bottom: 18px;
   z-index: 100;
-  overflow: hidden;
+  display: flex;
+  width: 292px;
+  flex-direction: column;
+  border: 1px solid #e6eaf0;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
 }
 
-/* Logo区域 */
 .sidebar-header {
-  padding: 30px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.logo {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 16px;
+  padding: 26px 24px 22px;
 }
 
-.logo-icon {
-  font-size: 42px;
-  line-height: 1;
+.brand-mark {
+  display: grid;
+  width: 60px;
+  height: 60px;
+  place-items: center;
+  flex-shrink: 0;
 }
 
-.logo-text {
-  flex: 1;
+.brand-logo {
+  display: block;
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+}
+
+.brand-copy {
+  min-width: 0;
 }
 
 .logo-title {
+  color: #273142;
   font-size: 18px;
   font-weight: 700;
-  color: #2c3e50;
-  margin-bottom: 4px;
+  line-height: 1.2;
 }
 
 .logo-subtitle {
-  font-size: 12px;
-  color: rgba(44, 62, 80, 0.6);
-  font-weight: 500;
+  margin-top: 4px;
+  color: #7a8595;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
-/* 导航菜单 */
 .nav-menu {
   flex: 1;
-  padding: 20px 15px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  padding: 8px 14px 18px;
   overflow-y: auto;
-  min-height: 0;
 }
 
 .nav-item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 15px;
-  padding: 16px 20px;
-  border-radius: 15px;
-  color: rgba(44, 62, 80, 0.7);
+  gap: 14px;
+  min-height: 60px;
+  margin-bottom: 8px;
+  padding: 0 20px;
+  border-radius: 18px;
+  color: #6c7c92;
   text-decoration: none;
-  transition: all 0.3s ease;
-  position: relative;
-  font-weight: 500;
-  font-size: 15px;
+  transition:
+    background-color 0.22s ease,
+    color 0.22s ease,
+    transform 0.22s ease,
+    box-shadow 0.22s ease;
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.4);
-  color: #2c3e50;
-  transform: translateX(5px);
+  background: #f6f7f9;
+  color: #2d3646;
+  transform: translateX(2px);
 }
 
 .nav-item.active {
-  background: rgba(255, 255, 255, 0.6);
-  color: #2c3e50;
-  font-weight: 600;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  background: #f1f3f6;
+  color: #243041;
+  box-shadow: inset 0 0 0 1px #e5e9ef;
 }
 
-.nav-item.active::before {
-  content: '';
+.nav-active-bar {
   position: absolute;
   left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 70%;
-  background: linear-gradient(to bottom, #3498db, #2980b9);
-  border-radius: 0 2px 2px 0;
+  top: 12px;
+  bottom: 12px;
+  width: 5px;
+  border-radius: 0 999px 999px 0;
+  background: #1f2c3d;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+.nav-item.active .nav-active-bar {
+  opacity: 1;
 }
 
 .nav-icon {
+  flex-shrink: 0;
+  color: currentColor;
   font-size: 24px;
-  line-height: 1;
 }
 
 .nav-label {
-  flex: 1;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
-/* 侧边栏底部 - 用户信息 */
 .sidebar-footer {
-  padding: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.3);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  padding: 18px 18px 20px;
+  border-top: 1px solid #edf0f4;
 }
 
-/* 语言切换按钮 */
-.language-btn {
+.language-btn,
+.logout-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border-radius: 12px;
-  border: none;
-  background: rgba(52, 152, 219, 0.15);
-  color: #2980b9;
-  font-weight: 600;
-  font-size: 13px;
+  gap: 10px;
+  min-height: 52px;
+  border: 1px solid #e2e7ee;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #314156;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.3s ease;
-  width: 100%;
+  transition:
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    transform 0.22s ease,
+    color 0.22s ease;
 }
 
-.language-btn:hover {
-  background: rgba(52, 152, 219, 0.25);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(52, 152, 219, 0.2);
+.language-btn:hover,
+.logout-btn:hover {
+  border-color: #d5dce5;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+  transform: translateY(-1px);
 }
 
-.language-icon {
-  font-size: 16px;
-  line-height: 1;
-}
-
-.language-text {
-  line-height: 1;
+.language-icon,
+.logout-icon {
+  font-size: 18px;
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.3);
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #e2e7ee;
+  border-radius: 18px;
+  background: #fbfcfd;
 }
 
 .user-avatar {
-  font-size: 32px;
-  line-height: 1;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.5);
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  place-items: center;
   border-radius: 50%;
+  background: #f0f2f5;
+  color: #506177;
+  font-size: 24px;
 }
 
 .user-details {
-  flex: 1;
   min-width: 0;
+  flex: 1;
 }
 
 .user-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: #2c3e50;
-  margin-bottom: 2px;
+  color: #283141;
+  font-size: 16px;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .user-role {
-  font-size: 12px;
-  color: rgba(44, 62, 80, 0.6);
-  font-weight: 500;
+  margin-top: 4px;
+  color: #8691a0;
+  font-size: 13px;
+  font-weight: 600;
 }
 
-.logout-btn {
+.main-wrapper {
+  flex: 1;
+  min-height: 100vh;
+  margin-left: 328px;
+  border-left: 1px solid #e9edf2;
+}
+
+.content-area {
+  position: relative;
+  z-index: 10;
+  min-height: 100vh;
+  padding: 18px;
+}
+
+.content-area--locked {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.content-shell {
+  position: relative;
+  min-height: calc(100vh - 36px);
+}
+
+.content-shell--locked {
+  overflow: hidden;
+}
+
+.feature-lock-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 12px 20px;
-  border-radius: 12px;
-  border: none;
-  background: rgba(231, 76, 60, 0.15);
-  color: #c0392b;
+  padding: 24px;
+  border-radius: 28px;
+  background: rgba(246, 248, 251, 0.7);
+  backdrop-filter: blur(6px);
+  pointer-events: all;
+}
+
+.feature-lock-card {
+  max-width: 420px;
+  padding: 28px 32px;
+  border: 1px solid rgba(207, 216, 228, 0.95);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 22px 48px rgba(31, 44, 61, 0.12);
+  text-align: center;
+}
+
+.feature-lock-title {
+  color: #233145;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.feature-lock-desc {
+  margin-top: 10px;
+  color: #728095;
+  font-size: 15px;
   font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  width: 100%;
+  line-height: 1.7;
 }
 
-.logout-btn:hover {
-  background: rgba(231, 76, 60, 0.25);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(231, 76, 60, 0.2);
-}
-
-.logout-icon {
-  font-size: 18px;
-  line-height: 1;
-}
-
-.logout-text {
-  line-height: 1;
-}
-
-/* 主内容区 */
-.main-wrapper {
-  flex: 1;
-  margin-left: 300px;
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
-
-/* 内容区 */
-.content-area {
-  flex: 1;
-  padding: 20px 20px 20px 0;
-  margin-right: 20px;
-  margin-top: 20px;
-  position: relative;
-  z-index: 10;
-}
-
-/* 滚动条样式 */
 .nav-menu::-webkit-scrollbar {
   width: 6px;
 }
 
-.nav-menu::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
-}
-
 .nav-menu::-webkit-scrollbar-thumb {
-  background: rgba(44, 62, 80, 0.2);
-  border-radius: 3px;
+  border-radius: 999px;
+  background: rgba(185, 195, 208, 0.95);
 }
 
-.nav-menu::-webkit-scrollbar-thumb:hover {
-  background: rgba(44, 62, 80, 0.3);
+.nav-menu::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-/* 响应式设计 */
-@media (max-width: 1200px) {
+@media (max-width: 1280px) {
   .sidebar {
-    width: 80px;
-    left: 10px;
-    top: 10px;
-    bottom: 10px;
-  }
-
-  .logo-text,
-  .nav-label {
-    display: none;
-  }
-
-  .logo {
-    justify-content: center;
-  }
-
-  .nav-item {
-    justify-content: center;
-    padding: 16px;
-  }
-
-  .nav-item.active::before {
-    width: 3px;
+    width: 248px;
   }
 
   .main-wrapper {
-    margin-left: 110px;
+    margin-left: 284px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 94px;
+    padding-top: 8px;
   }
 
-  /* 侧边栏底部响应式 */
-  .sidebar-footer {
-    padding: 15px 10px;
+  .sidebar-header {
+    justify-content: center;
+    padding: 20px 12px 18px;
   }
 
-  .language-btn {
-    padding: 8px;
-    gap: 0;
-  }
-
-  .language-text {
-    display: none;
-  }
-
-  .language-icon {
-    font-size: 18px;
-  }
-
-  .user-info {
-    flex-direction: column;
-    padding: 10px;
-    gap: 8px;
-  }
-
-  .user-avatar {
-    width: 36px;
-    height: 36px;
-    font-size: 24px;
-  }
-
-  .user-details {
-    display: none;
-  }
-
-  .logout-btn {
-    padding: 10px;
-    gap: 0;
-  }
-
+  .brand-copy,
+  .nav-label,
+  .language-text,
+  .user-details,
   .logout-text {
     display: none;
   }
 
-  .logout-icon {
-    font-size: 20px;
+  .nav-menu {
+    padding: 8px 10px 16px;
+  }
+
+  .nav-item {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .sidebar-footer {
+    padding: 16px 12px 18px;
+  }
+
+  .user-info {
+    justify-content: center;
+    padding: 12px 10px;
+  }
+
+  .main-wrapper {
+    margin-left: 120px;
   }
 }
 
 @media (max-width: 768px) {
   .sidebar {
-    width: 70px;
-    border-radius: 15px;
+    left: 10px;
+    top: 10px;
+    bottom: 10px;
+    width: 78px;
+    border-radius: 22px;
   }
 
-  .sidebar-header {
-    padding: 20px 10px;
+  .brand-mark {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
   }
 
-  .logo-icon {
-    font-size: 32px;
-  }
-
-  .nav-menu {
-    padding: 15px 8px;
+  .nav-item {
+    min-height: 54px;
   }
 
   .nav-icon {
+    font-size: 21px;
+  }
+
+  .language-btn,
+  .logout-btn {
+    min-height: 46px;
+  }
+
+  .user-avatar {
+    width: 42px;
+    height: 42px;
     font-size: 20px;
   }
 
   .main-wrapper {
-    margin-left: 90px;
+    margin-left: 96px;
   }
 
   .content-area {
-    padding: 15px 10px 15px 0;
-    margin-right: 10px;
-    margin-top: 15px;
+    padding: 10px;
   }
 
-  /* 侧边栏底部移动端样式 */
-  .sidebar-footer {
-    padding: 12px 8px;
+  .content-shell {
+    min-height: calc(100vh - 20px);
   }
 
-  .language-btn {
-    padding: 8px;
+  .feature-lock-card {
+    max-width: 100%;
+    padding: 24px 20px;
+    border-radius: 20px;
   }
 
-  .language-icon {
-    font-size: 16px;
-  }
-
-  .user-avatar {
-    width: 32px;
-    height: 32px;
+  .feature-lock-title {
     font-size: 20px;
   }
 }

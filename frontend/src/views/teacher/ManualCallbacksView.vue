@@ -56,6 +56,8 @@ import { useI18n } from 'vue-i18n';
 import { getManualCallbacks, deleteManualCallback } from '@/api/teacher';
 import type { ManualCallbackItem } from '@/types';
 import { ElMessage } from 'element-plus';
+import { useAuthStore } from '@/stores/auth';
+import { getPortalConversationPath, getPortalLeadDetailPath } from '@/router/portalRoutes';
 
 const { t } = useI18n();
 
@@ -63,6 +65,7 @@ const callbacks = ref<ManualCallbackItem[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const router = useRouter();
+const authStore = useAuthStore();
 
 async function fetchCallbacks() {
   loading.value = true;
@@ -79,11 +82,11 @@ async function fetchCallbacks() {
 
 function viewCallback(callback: ManualCallbackItem) {
   if (callback.lead_id) {
-    router.push({ path: `/teacher/leads/${callback.lead_id}` });
+    router.push(getPortalLeadDetailPath(authStore.userRole, callback.lead_id));
     return;
   }
 
-  router.push({ name: 'TeacherConversation', params: { id: callback.conversation_id } });
+  router.push(getPortalConversationPath(authStore.userRole, callback.conversation_id));
 }
 
 async function handleDelete(conversationId: string) {

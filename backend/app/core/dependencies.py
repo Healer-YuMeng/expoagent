@@ -9,7 +9,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt
 
 from app.db import PostgresCompatDatabase, get_database
-from app.models.user import UserSchema
+from app.models.user import UserSchema, normalize_user_role
 from app.core.config import settings
 
 # HTTP Bearer Token 安全方案
@@ -27,6 +27,8 @@ def create_access_token(data: dict) -> str:
         str: JWT token
     """
     to_encode = data.copy()
+    if "role" in to_encode:
+        to_encode["role"] = normalize_user_role(to_encode["role"])
     expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -137,7 +139,7 @@ async def get_current_teacher(
     """
     兼容旧命名：教师/管理员/超级管理员均视为“老师端”可访问
     """
-    if current_user.role not in ("teacher", "school_admin", "super_admin"):
+    if current_user.role not in ("sales", "admin", "super_admin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="需要老师权限"
@@ -151,7 +153,7 @@ async def get_current_admin(
     """
     学校管理员或超级管理员
     """
-    if current_user.role not in ("school_admin", "super_admin"):
+    if current_user.role not in ("admin", "super_admin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="需要管理员权限"

@@ -15,8 +15,25 @@ export const CHANNELS: ChannelInfo[] = [
   { slug: 'wxsp', name: '微信视频号', description: '微信生态短视频' },
 ];
 
+const START_CHAT_PATH = '/start-chat';
 const SOURCE_STORAGE_KEY = 'ycis_channel_source';
 const VISIT_FLAG_PREFIX = 'ycis_channel_visit_logged_';
+
+function isAbsoluteUrl(value: string): boolean {
+  return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(value);
+}
+
+function getUrlParts(base: string) {
+  const trimmed = base.trim() || '/';
+  const absolute = isAbsoluteUrl(trimmed);
+  const url = absolute ? new URL(trimmed) : new URL(trimmed, 'http://placeholder.local');
+
+  if (url.pathname === '/' || url.pathname === '') {
+    url.pathname = START_CHAT_PATH;
+  }
+
+  return { absolute, url };
+}
 
 export function normalizeChannelSource(raw?: string | null): ChannelSlug | null {
   if (!raw) return null;
@@ -57,7 +74,16 @@ export function shouldTrackVisit(slug: ChannelSlug): boolean {
   return true;
 }
 
+export function buildStartChatEntryUrl(base: string, params: Record<string, string> = {}): string {
+  const { absolute, url } = getUrlParts(base);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) {
+      url.searchParams.set(key, value);
+    }
+  });
+  return absolute ? url.toString() : `${url.pathname}${url.search}`;
+}
+
 export function buildChannelUrl(base: string, slug: ChannelSlug): string {
-  const trimmed = base.endsWith('/') ? base : `${base}/`;
-  return `${trimmed}?source=${slug}`;
+  return buildStartChatEntryUrl(base, { source: slug });
 }

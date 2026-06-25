@@ -9,10 +9,10 @@ from typing import Optional
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.db import PostgresCompatDatabase, get_database
-from app.models.user import UserSchema, UserCreateRequest
+from app.models.user import UserSchema, UserCreateRequest, is_valid_account_identifier
 from app.core.dependencies import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -24,8 +24,18 @@ router = APIRouter(prefix="/api/v1/auth", tags=["认证"])
 
 class LoginRequest(BaseModel):
     """通用登录请求"""
-    phone: str = Field(..., description="手机号或账号", pattern=r"(^1[3-9]\d{9}$)|^(admin|root)$")
+    phone: str = Field(..., description="手机号或账号")
     password: str = Field(..., description="密码", min_length=3)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("账号不能为空")
+        if not is_valid_account_identifier(normalized):
+            raise ValueError("账号必须是11位手机号，或3-32位字母/数字/下划线/中划线组合")
+        return normalized
 
 
 class LoginResponse(BaseModel):
@@ -98,6 +108,7 @@ async def register_user(
     user_dict = user.model_dump()
     result = await db.users.insert_one(user_dict)
     user.id = str(result.inserted_id)
+    access_token = user.create_access_token()
     
     logger.info(f"新用户注册成功: {phone}, 角色: {user.role}")
     
@@ -137,8 +148,8 @@ async def login_user(
     
     # 若默认 admin/root 不存在，自动创建
     if not user_dict and phone in ("admin", "root"):
-        default_role = "school_admin" if phone == "admin" else "super_admin"
-        default_name = "默认学校管理员" if phone == "admin" else "默认超级管理员"
+        default_role = "admin" if phone == "admin" else "super_admin"
+        default_name = "默认普通管理员" if phone == "admin" else "默认超级管理员"
         default_school_id = "default_school" if phone == "admin" else None
         default_school_name = "默认学校" if phone == "admin" else None
         user_obj = UserSchema(

@@ -128,7 +128,7 @@ import { formatChinaDateTime } from '@/utils/time';
 const authStore = useAuthStore();
 const authRole = computed(() => authStore.userRole);
 const effectiveSchoolId = computed(() => {
-  if (authRole.value === 'school_admin') {
+  if (authRole.value === 'admin') {
     return authStore.user?.school_id || '';
   }
   return schoolId.value;
@@ -335,7 +335,7 @@ onMounted(() => {
   if (authRole.value === 'super_admin') {
     void (async () => {
       try {
-        const res = await listManagedUsers('school_admin');
+        const res = await listManagedUsers('admin');
         schools.value = (res.items || [])
           .filter((u) => u.school_id)
           .map((u) => ({ id: u.school_id as string, name: u.school_name || (u.school_id as string) }));

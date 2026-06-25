@@ -131,7 +131,7 @@
       </div>
     </div>
 
-    <div class="settings-section glass" v-if="authStore.userRole === 'school_admin' || authStore.userRole === 'super_admin'">
+    <div class="settings-section glass" v-if="authStore.userRole === 'admin' || authStore.userRole === 'super_admin'">
       <div class="section-title">🎫 {{ t('settings.parentEntryTitle') }}</div>
       <div class="section-description">
         {{ t('settings.parentEntryDesc') }}
@@ -153,7 +153,7 @@ import type { AxiosError } from 'axios';
 import { getWelcomeMessage, updateWelcomeMessage, translateWelcomeMessage } from '@/api/teacher';
 import { useI18n } from 'vue-i18n';
 import QRCode from 'qrcode';
-import { CHANNELS, buildChannelUrl, type ChannelSlug } from '@/utils/channelSource';
+import { CHANNELS, buildChannelUrl, buildStartChatEntryUrl, type ChannelSlug } from '@/utils/channelSource';
 import { useAuthStore } from '@/stores/auth';
 
 const { t } = useI18n();
@@ -178,7 +178,7 @@ const saving = ref(false);
 const translating = ref(false);
 const error = ref<string | null>(null);
 const channels = CHANNELS; // TODO: replace with backend-provided channel list when API is ready
-const qrBaseUrl = ref<string>('http://101.35.111.34:8006/');
+const qrBaseUrl = ref<string>(window.location.origin);
 const qrPreviews = ref<Partial<Record<ChannelSlug, { url: string; dataUrl: string | null }>>>({});
 const generatingQrs = ref(false);
 const channelLabelMap: Record<ChannelSlug, string> = {
@@ -356,10 +356,8 @@ const getChannelDescription = (slug: ChannelSlug) => t(`settings.channelDescript
 
 const authStore = useAuthStore();
 const parentEntryUrl = computed(() => {
-  const origin = window.location.origin;
   const schoolId = authStore.user?.school_id || '';
-  if (!schoolId) return `${origin}/start-chat`;
-  return `${origin}/start-chat?school_id=${schoolId}`;
+  return buildStartChatEntryUrl(qrBaseUrl.value, schoolId ? { school_id: schoolId } : {});
 });
 
 const copyParentLink = async () => {

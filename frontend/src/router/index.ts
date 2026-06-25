@@ -4,6 +4,7 @@ import TeacherLayout from '@/components/TeacherLayout.vue';
 import ParentLayout from '@/components/ParentLayout.vue';
 import i18n from '@/i18n';
 import { getAppStorageItem } from '@/utils/browserStorage';
+import { getPortalHomePath } from './portalRoutes';
 
 const routes = [
   {
@@ -21,66 +22,163 @@ const routes = [
     name: 'Login',
     component: () => import('@/views/auth/LoginView.vue'),
   },
-  // 后台布局
+  // 超级管理员后台
   {
-    path: '/teacher',
+    path: '/admin-system',
     component: TeacherLayout,
-    meta: { requiresAuth: true, roles: ['teacher', 'school_admin', 'super_admin'] },
-    redirect: '/teacher/dashboard',
+    meta: { requiresAuth: true, roles: ['super_admin'] },
     children: [
       {
-        path: 'dashboard',
-        name: 'Dashboard',
+        path: '',
+        name: 'SuperAdminPortalHome',
         component: () => import('@/views/teacher/DashboardView.vue'),
       },
       {
         path: 'leads',
-        name: 'LeadList',
+        name: 'SuperAdminLeadList',
         component: () => import('@/views/teacher/LeadsView.vue'),
       },
       {
         path: 'manual-callbacks',
-        name: 'ManualCallbacks',
+        name: 'SuperAdminManualCallbacks',
         component: () => import('@/views/teacher/ManualCallbacksView.vue'),
       },
       {
         path: 'knowledge-base',
-        name: 'KnowledgeBase',
+        name: 'SuperAdminKnowledgeBase',
         component: () => import('@/views/teacher/KnowledgeBaseView.vue'),
-        meta: { roles: ['teacher', 'school_admin'] },
+        meta: { roles: ['super_admin'] },
       },
       {
         path: 'system-prompt',
-        name: 'SystemPrompt',
+        name: 'SuperAdminSystemPrompt',
         component: () => import('@/views/teacher/SystemPromptView.vue'),
-        meta: { roles: ['school_admin', 'super_admin'] },
+        meta: { roles: ['super_admin'] },
       },
       {
         path: 'users',
-        name: 'UserManagement',
+        name: 'SuperAdminUserManagement',
         component: () => import('@/views/teacher/UserManagementView.vue'),
-        meta: { roles: ['school_admin', 'super_admin'] },
+        meta: { roles: ['super_admin'] },
       },
       {
         path: 'system-settings',
-        name: 'SystemSettings',
+        name: 'SuperAdminSystemSettings',
         component: () => import('@/views/teacher/SystemSettingsView.vue'),
       },
       {
         path: 'conversation/:id',
-        name: 'TeacherConversation',
+        name: 'SuperAdminConversationDetail',
         component: () => import('@/views/teacher/ConversationDetailView.vue'),
       },
       {
         path: 'leads/:id',
-        name: 'LeadDetail',
+        name: 'SuperAdminLeadDetail',
         component: () => import('@/views/teacher/LeadDetailView.vue'),
       },
-    ]
+    ],
+  },
+  // 普通管理员后台
+  {
+    path: '/expo-system',
+    component: TeacherLayout,
+    meta: { requiresAuth: true, roles: ['admin'] },
+    children: [
+      {
+        path: '',
+        name: 'SchoolAdminPortalHome',
+        component: () => import('@/views/teacher/DashboardView.vue'),
+      },
+      {
+        path: 'leads',
+        name: 'SchoolAdminLeadList',
+        component: () => import('@/views/teacher/LeadsView.vue'),
+      },
+      {
+        path: 'manual-callbacks',
+        name: 'SchoolAdminManualCallbacks',
+        component: () => import('@/views/teacher/ManualCallbacksView.vue'),
+      },
+      {
+        path: 'knowledge-base',
+        name: 'SchoolAdminKnowledgeBase',
+        component: () => import('@/views/teacher/KnowledgeBaseView.vue'),
+      },
+      {
+        path: 'system-prompt',
+        name: 'SchoolAdminSystemPrompt',
+        component: () => import('@/views/teacher/SystemPromptView.vue'),
+        meta: { roles: ['admin'] },
+      },
+      {
+        path: 'users',
+        name: 'SchoolAdminUserManagement',
+        component: () => import('@/views/teacher/UserManagementView.vue'),
+        meta: { roles: ['admin'] },
+      },
+      {
+        path: 'system-settings',
+        name: 'SchoolAdminSystemSettings',
+        component: () => import('@/views/teacher/SystemSettingsView.vue'),
+      },
+      {
+        path: 'conversation/:id',
+        name: 'SchoolAdminConversationDetail',
+        component: () => import('@/views/teacher/ConversationDetailView.vue'),
+      },
+      {
+        path: 'leads/:id',
+        name: 'SchoolAdminLeadDetail',
+        component: () => import('@/views/teacher/LeadDetailView.vue'),
+      },
+    ],
+  },
+  // 销售后台
+  {
+    path: '/expo-system/user',
+    component: TeacherLayout,
+    meta: { requiresAuth: true, roles: ['sales'] },
+    children: [
+      {
+        path: '',
+        name: 'TeacherPortalHome',
+        component: () => import('@/views/teacher/DashboardView.vue'),
+      },
+      {
+        path: 'leads',
+        name: 'TeacherLeadList',
+        component: () => import('@/views/teacher/LeadsView.vue'),
+      },
+      {
+        path: 'manual-callbacks',
+        name: 'TeacherManualCallbacks',
+        component: () => import('@/views/teacher/ManualCallbacksView.vue'),
+      },
+      {
+        path: 'knowledge-base',
+        name: 'TeacherKnowledgeBase',
+        component: () => import('@/views/teacher/KnowledgeBaseView.vue'),
+      },
+      {
+        path: 'system-settings',
+        name: 'TeacherSystemSettings',
+        component: () => import('@/views/teacher/SystemSettingsView.vue'),
+      },
+      {
+        path: 'conversation/:id',
+        name: 'TeacherConversationDetail',
+        component: () => import('@/views/teacher/ConversationDetailView.vue'),
+      },
+      {
+        path: 'leads/:id',
+        name: 'TeacherLeadDetail',
+        component: () => import('@/views/teacher/LeadDetailView.vue'),
+      },
+    ],
   },
   // 家长端布局 (公开访问)
   {
-    path: '/parent',
+    path: '/expoagent',
     component: ParentLayout,
     children: [
       {
@@ -106,6 +204,12 @@ const router = createRouter({
 // 全局路由守卫
 router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore();
+  if (!authStore.ensureValidSession()) {
+    if (to.meta.requiresAuth) {
+      next({ name: 'Login', query: { redirect: to.fullPath } });
+      return;
+    }
+  }
   const savedLocale = getAppStorageItem('selectedLanguage');
   const supportedLocales = ['zh-CN', 'en', 'zh-TW', 'ja', 'ko', 'fr', 'es', 'ru'] as const;
   if (savedLocale && supportedLocales.includes(savedLocale as (typeof supportedLocales)[number]) && i18n.global.locale.value !== savedLocale) {
@@ -118,6 +222,10 @@ router.beforeEach((to, _from, next) => {
     next({ name: 'Login', query: { redirect: to.fullPath } });
   } else if (toRoles && toRoles.length > 0 && (!userRole || !toRoles.includes(userRole))) {
     console.warn(`Role mismatch: Required ${toRoles}, but user has ${authStore.userRole}`);
+    if (authStore.isAuthenticated) {
+      next(getPortalHomePath(userRole));
+      return;
+    }
     next({ name: 'NotFound' });
   } else {
     next();

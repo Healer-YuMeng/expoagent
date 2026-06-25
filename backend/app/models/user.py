@@ -1,7 +1,8 @@
 """
 用户模型 - 支持家长和管理员两种角色
 """
-from pydantic import BaseModel, Field, field_validator
+import re
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, Literal
 from datetime import datetime, timedelta
 from bson import ObjectId
@@ -14,6 +15,39 @@ from jose import JWTError, jwt
 from app.core.config import settings
 
 
+PHONE_REGEX = re.compile(r"^1[3-9]\d{9}$")
+CUSTOM_ACCOUNT_REGEX = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{2,31}$")
+ROLE_ALIASES = {
+    "parent": "parent",
+    "teacher": "sales",
+    "sales": "sales",
+    "school_admin": "admin",
+    "admin": "admin",
+    "super_admin": "super_admin",
+}
+SALES_ROLE_VALUES = ("sales", "teacher")
+ADMIN_ROLE_VALUES = ("admin", "school_admin")
+
+
+def is_phone_number(value: str) -> bool:
+    return bool(PHONE_REGEX.fullmatch(value))
+
+
+def is_custom_account(value: str) -> bool:
+    return value in ("admin", "root") or bool(CUSTOM_ACCOUNT_REGEX.fullmatch(value))
+
+
+def is_valid_account_identifier(value: str) -> bool:
+    return is_phone_number(value) or is_custom_account(value)
+
+
+def normalize_user_role(value: str) -> str:
+    normalized = ROLE_ALIASES.get(str(value or "").strip())
+    if not normalized:
+        raise ValueError("无效的用户角色")
+    return normalized
+
+
 class UserSchema(BaseModel):
     """用户数据模型"""
     id: Optional[str] = Field(default=None, alias="_id")
@@ -21,7 +55,7 @@ class UserSchema(BaseModel):
     # 通用字段
     phone: str = Field(..., description="手机号（唯一标识）")
     password_hash: Optional[str] = Field(default="", description="加密后的密码")
-    role: Literal["parent", "teacher", "school_admin", "super_admin"] = Field(..., description="用户角色")
+    role: Literal["parent", "sales", "admin", "super_admin"] = Field(..., description="用户角色")
     is_active: bool = Field(default=True, description="账号是否激活")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -32,7 +66,7 @@ class UserSchema(BaseModel):
     email: Optional[str] = Field(default=None, description="邮箱")
     school_id: Optional[str] = Field(default=None, description="学校标识（管理员）")
     school_name: Optional[str] = Field(default=None, description="学校名称（管理员）")
-    admin_id: Optional[str] = Field(default=None, description="老师绑定的管理员 ID")
+    admin_id: Optional[str] = Field(default=None, description="销售绑定的管理员 ID")
     
     # 家长专属字段
     parent_name: Optional[str] = Field(default=None, description="家长姓名")
@@ -61,14 +95,28 @@ class UserSchema(BaseModel):
     
     @field_validator('phone')
     @classmethod
-    def validate_phone(cls, v: str) -> str:
-        """验证手机号格式"""
-        # 允许特殊账号 admin/root
-        if v in ("admin", "root"):
-            return v
-        if not v.isdigit() or len(v) != 11:
-            raise ValueError('手机号必须是11位数字')
-        return v
+    def normalize_phone(cls, v: str) -> str:
+        value = v.strip()
+        if not value:
+            raise ValueError('账号不能为空')
+        return value
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def normalize_role(cls, value: str) -> str:
+        return normalize_user_role(value)
+
+    @model_validator(mode="after")
+    def validate_account_identifier(self):
+        """家长必须使用手机号；老师和管理员支持手机号或自定义账号。"""
+        if self.role == "parent":
+            if not is_phone_number(self.phone):
+                raise ValueError("家长账号必须使用11位手机号")
+            return self
+
+        if not is_valid_account_identifier(self.phone):
+            raise ValueError("账号必须是11位手机号，或3-32位字母/数字/下划线/中划线组合")
+        return self
     
     @field_validator('student_age')
     @classmethod
@@ -136,7 +184,7 @@ class UserCreateRequest(BaseModel):
     """用户注册请求"""
     phone: str
     password: str = Field(..., min_length=6, description="密码至少6位")
-    role: Literal["parent", "teacher", "school_admin", "super_admin"] = "parent"
+    role: Literal["parent", "sales", "admin", "super_admin"] = "parent"
     
     # 家长注册字段
     parent_name: Optional[str] = None
@@ -155,6 +203,30 @@ class UserCreateRequest(BaseModel):
             }
         }
 
+    @field_validator("phone")
+    @classmethod
+    def normalize_phone(cls, v: str) -> str:
+        value = v.strip()
+        if not value:
+            raise ValueError("账号不能为空")
+        return value
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def normalize_role(cls, value: str) -> str:
+        return normalize_user_role(value)
+
+    @model_validator(mode="after")
+    def validate_account_identifier(self):
+        if self.role == "parent":
+            if not is_phone_number(self.phone):
+                raise ValueError("家长账号必须使用11位手机号")
+            return self
+
+        if not is_valid_account_identifier(self.phone):
+            raise ValueError("账号必须是11位手机号，或3-32位字母/数字/下划线/中划线组合")
+        return self
+
 
 class UserLoginRequest(BaseModel):
     """用户登录请求"""
@@ -168,6 +240,16 @@ class UserLoginRequest(BaseModel):
                 "password": "123456"
             }
         }
+
+    @field_validator("phone")
+    @classmethod
+    def validate_login_identifier(cls, v: str) -> str:
+        value = v.strip()
+        if not value:
+            raise ValueError("账号不能为空")
+        if not is_valid_account_identifier(value):
+            raise ValueError("账号格式不正确")
+        return value
 
 
 class UserResponse(BaseModel):

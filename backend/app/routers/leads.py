@@ -375,11 +375,11 @@ async def get_leads(
     - 按人工回访、高意向标记和创建时间排序
     """
     query: dict[str, Any] = {}
-    # 学校隔离：school_admin 按自身学校，teacher 按其 admin 对应学校，super_admin 不过滤
+    # 学校隔离：普通管理员按自身学校，销售按其 admin 对应学校，super_admin 不过滤
     school_scope = None
-    if current_teacher.role == "school_admin":
+    if current_teacher.role == "admin":
         school_scope = current_teacher.school_id
-    elif current_teacher.role == "teacher" and current_teacher.admin_id:
+    elif current_teacher.role == "sales" and current_teacher.admin_id:
         admin_doc = await db.users.find_one({"_id": current_teacher.admin_id}, {"school_id": 1})
         if admin_doc and admin_doc.get("school_id"):
             school_scope = admin_doc["school_id"]
@@ -648,9 +648,9 @@ async def get_lead_detail(
         )
     # 学校隔离校验
     school_id = None
-    if current_teacher.role == "school_admin":
+    if current_teacher.role == "admin":
         school_id = current_teacher.school_id
-    elif current_teacher.role == "teacher" and current_teacher.admin_id:
+    elif current_teacher.role == "sales" and current_teacher.admin_id:
         admin_doc = await db.users.find_one({"_id": current_teacher.admin_id}, {"school_id": 1})
         school_id = admin_doc.get("school_id") if admin_doc else None
     if school_id and lead_dict.get("school_id") and lead_dict["school_id"] != school_id:

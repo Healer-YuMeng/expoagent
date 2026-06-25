@@ -15,7 +15,7 @@
         <div class="quick-filters">
           <button 
             class="quick-filter-btn" 
-            :class="{ active: !filters.high_intent_only && !filters.manual_callback_only && !filters.appointment_status }"
+            :class="{ active: isAllLeadsFilterActive() }"
             @click="quickFilter('all')"
           >
             <span class="filter-icon">📋</span>
@@ -206,11 +206,14 @@ import { useI18n } from 'vue-i18n';
 import type { LeadListItem, WecomStatus } from '@/types';
 import { ElMessage } from 'element-plus';
 import { exportLeads as exportLeadsApi } from '@/api/lead';
+import { useAuthStore } from '@/stores/auth';
+import { getPortalLeadDetailPath } from '@/router/portalRoutes';
 
 const router = useRouter();
 const route = useRoute();
 const { t, locale } = useI18n();
 const leadStore = useLeadStore();
+const authStore = useAuthStore();
 const { leads, total, loading, error, filters } = storeToRefs(leadStore);
 
 // Local state for filters to avoid direct mutation before applying
@@ -228,6 +231,13 @@ const mockTeachers = [
   { id: 'teacher_b', name: 'B老师（模拟数据，后端上线需删除）' },
   { id: 'teacher_c', name: 'C老师（模拟数据，后端上线需删除）' },
 ];
+
+const isAllLeadsFilterActive = () => (
+  !filters.value.high_intent_only
+  && !filters.value.manual_callback_only
+  && !filters.value.appointment_status
+  && !filters.value.wecom_status
+);
 
 const applyFilters = () => {
   void leadStore.setFilters({
@@ -327,7 +337,7 @@ const handlePageChange = (page: number) => {
 };
 
 const viewDetails = (id: string) => {
-  router.push({ name: 'LeadDetail', params: { id } });
+  router.push(getPortalLeadDetailPath(authStore.userRole, id));
 };
 
 const handleDelete = async (id: string) => {
@@ -431,7 +441,7 @@ const getOwnerName = (lead: LeadListItem) => {
   if (!name) {
     return t('leads.followUpOwnerNone');
   }
-  if (name === '默认学校管理员' || name === 'Default School Admin') {
+  if (name === '默认学校管理员' || name === '默认普通管理员' || name === 'Default School Admin' || name === 'Default Admin') {
     return t('teacher.layout.defaultSchoolAdmin');
   }
   if (name === '默认超级管理员' || name === 'Default Super Admin') {

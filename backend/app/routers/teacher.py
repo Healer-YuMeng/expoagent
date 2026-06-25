@@ -1,6 +1,6 @@
 """
-老师端路由
-处理招生老师相关的工作台、线索等接口
+展会后台路由
+处理展会管理后台相关的工作台、线索等接口
 """
 import asyncio
 import logging
@@ -27,7 +27,7 @@ from app.routers.utils import build_lead_chat_lookup
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/teacher", tags=["老师端"])
+router = APIRouter(prefix="/api/v1/expo-system", tags=["展会后台"])
 AI_REPLY_AUTO_RESUME_DELAY_SECONDS = 300
 _ai_reply_auto_resume_tasks: dict[str, asyncio.Task] = {}
 AUTO_LEAD_PREFIX = "auto_lead"
@@ -444,7 +444,7 @@ async def get_welcome_message_setting(
     current_user: UserSchema = Depends(get_current_teacher),
     db: PostgresCompatDatabase = Depends(get_database),
 ) -> WelcomeMessageResponse:
-    scope_school = current_user.school_id if current_user.role == "school_admin" else None
+    scope_school = current_user.school_id if current_user.role == "admin" else None
     doc = await db[SYSTEM_SETTINGS_COLLECTION].find_one({"_id": _welcome_key(scope_school)})
     if not doc and scope_school:
         doc = await db[SYSTEM_SETTINGS_COLLECTION].find_one({"_id": _welcome_key(None)})
@@ -474,7 +474,7 @@ async def update_welcome_message_setting(
         )
 
     now = datetime.utcnow()
-    scope_school = current_user.school_id if current_user.role == "school_admin" else None
+    scope_school = current_user.school_id if current_user.role == "admin" else None
     await db[SYSTEM_SETTINGS_COLLECTION].update_one(
         {"_id": _welcome_key(scope_school)},
         {
@@ -671,7 +671,7 @@ async def delete_manual_callback(
 @router.get(
     "/conversations/{conversation_id}/messages",
     response_model=ConversationMessagesResponse,
-    summary="获取会话消息（老师端）",
+    summary="获取会话消息（展会后台）",
 )
 async def get_conversation_messages(
     conversation_id: str,

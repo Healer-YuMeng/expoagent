@@ -83,6 +83,7 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import type { FormInstance, FormRules } from 'element-plus';
 import { ElMessage } from 'element-plus';
 import { useAuthStore } from '@/stores/auth';
@@ -90,6 +91,7 @@ import { useI18n } from 'vue-i18n';
 import PaintBackground from '@/components/PaintBackground.vue';
 
 const authStore = useAuthStore();
+const route = useRoute();
 const { t } = useI18n();
 
 const loginFormRef = ref<FormInstance>();
@@ -104,7 +106,7 @@ const errorMessage = ref('');
 const loginRules = computed<FormRules>(() => ({
   phone: [
     { required: true, message: t('login.phoneRequired'), trigger: 'blur' },
-    { pattern: /^(admin|root|1[3-9]\d{9})$/, message: t('login.phoneInvalid'), trigger: 'blur' }
+    { pattern: /^(admin|root|1[3-9]\d{9}|[A-Za-z0-9][A-Za-z0-9_-]{2,31})$/, message: t('login.phoneInvalid'), trigger: 'blur' }
   ],
   password: [
     { required: true, message: t('login.passwordRequired'), trigger: 'blur' },
@@ -122,7 +124,8 @@ const handleLogin = async () => {
     if (valid) {
       loading.value = true;
       try {
-        await authStore.login(loginForm.value);
+        const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : null;
+        await authStore.login(loginForm.value, redirect);
         ElMessage.success(t('login.loginSuccess'));
         // 路由跳转由 authStore 内部处理
       } catch (error: any) {
