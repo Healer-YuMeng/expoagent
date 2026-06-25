@@ -38,7 +38,7 @@ import { captureSourceFromQuery, shouldTrackVisit } from '@/utils/channelSource'
 import { trackChannelVisit } from '@/api/channelMetrics';
 import { getAppStorageItem } from '@/utils/browserStorage';
 
-const PUBLIC_CHAT_URL = 'http://101.35.111.34:8606/parent/conversations/6a3cb915e1ab6593d4c74731?assistant_id=fea1734f-c2e5-4bd0-aadc-61b69a11d88b';
+const PUBLIC_CHAT_URL = 'http://101.35.111.34:8606/?assistant_id=fea1734f-c2e5-4bd0-aadc-61b69a11d88b';
 
 const router = useRouter();
 const route = useRoute();

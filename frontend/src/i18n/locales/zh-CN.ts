@@ -130,7 +130,7 @@ export default {
     },
   },
   login: {
-    welcome: '欢迎回来',
+    welcome: '展会智能助手管理平台',
     subtitle: '登录您的账户以继续',
     phone: '手机号',
     phonePlaceholder: '请输入手机号',
