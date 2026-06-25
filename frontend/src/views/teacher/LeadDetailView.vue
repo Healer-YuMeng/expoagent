@@ -435,7 +435,7 @@ const getOwnerName = () => {
   if (!name) {
     return t('leads.followUpOwnerNone');
   }
-  if (name === '默认学校管理员' || name === 'Default School Admin') {
+  if (name === '默认学校管理员' || name === '默认普通管理员' || name === 'Default School Admin' || name === 'Default Admin') {
     return t('teacher.layout.defaultSchoolAdmin');
   }
   if (name === '默认超级管理员' || name === 'Default Super Admin') {

@@ -36,19 +36,19 @@ async def _resolve_teacher_school(
     user: UserSchema,
     requested_school_id: Optional[str] = None,
 ) -> str:
-    if user.role == "school_admin":
+    if user.role == "admin":
         if not user.school_id:
             raise HTTPException(status_code=400, detail="管理员未绑定学校，无法操作知识库")
         return user.school_id
-    if user.role == "teacher":
+    if user.role == "sales":
         if user.school_id:
             return user.school_id
         if not user.admin_id:
-            raise HTTPException(status_code=400, detail="老师未绑定学校管理员，无法操作知识库")
+            raise HTTPException(status_code=400, detail="销售未绑定普通管理员，无法操作知识库")
         admin_doc = await db.users.find_one({"_id": user.admin_id}, {"school_id": 1})
         school_id = str(admin_doc.get("school_id") or "").strip() if admin_doc else ""
         if not school_id:
-            raise HTTPException(status_code=400, detail="老师所属学校未配置，无法操作知识库")
+            raise HTTPException(status_code=400, detail="销售所属学校未配置，无法操作知识库")
         return school_id
     school_id = (requested_school_id or "").strip()
     if not school_id:

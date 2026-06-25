@@ -44,7 +44,7 @@
             - test -n "$SERVER_DOCKER_USERNAME"
             - test -n "$SERVER_DOCKER_PASSWORD"
             - echo "$SERVER_DOCKER_PASSWORD" | docker login "$SERVER_DOCKER_REGISTRY" -u "$SERVER_DOCKER_USERNAME" --password-stdin
-            - DOCKER_BUILDKIT=1 docker build --progress=plain --build-arg tiao="${tiao:-8606/visitor}" -f frontend/Dockerfile -t "${SERVER_DOCKER_REGISTRY}/${SERVER_DOCKER_NAMESPACE}/${FRONTEND_IMAGE_NAME}:${CNB_COMMIT_SHORT}" -t "${SERVER_DOCKER_REGISTRY}/${SERVER_DOCKER_NAMESPACE}/${FRONTEND_IMAGE_NAME}:latest" .
+            - DOCKER_BUILDKIT=1 docker build --progress=plain --build-arg tiao="${tiao:-8606/expo-system}" -f frontend/Dockerfile -t "${SERVER_DOCKER_REGISTRY}/${SERVER_DOCKER_NAMESPACE}/${FRONTEND_IMAGE_NAME}:${CNB_COMMIT_SHORT}" -t "${SERVER_DOCKER_REGISTRY}/${SERVER_DOCKER_NAMESPACE}/${FRONTEND_IMAGE_NAME}:latest" .
             - docker push "${SERVER_DOCKER_REGISTRY}/${SERVER_DOCKER_NAMESPACE}/${FRONTEND_IMAGE_NAME}:${CNB_COMMIT_SHORT}"
             - docker push "${SERVER_DOCKER_REGISTRY}/${SERVER_DOCKER_NAMESPACE}/${FRONTEND_IMAGE_NAME}:latest"
 

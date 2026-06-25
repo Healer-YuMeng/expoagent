@@ -1,5 +1,5 @@
 """
-星途招生系统后端主应用
+展会智能助手后端主应用
 """
 import logging
 from pathlib import Path
@@ -26,8 +26,8 @@ uvicorn_logger = logging.getLogger("uvicorn.access")
 uvicorn_logger.addFilter(MetricsFilter())
 
 app = FastAPI(
-    title="星途招生系统 API",
-    description="招生管理系统后端 API",
+    title="展会智能助手后台管理系统 API",
+    description="展会智能体管理平台后端 API",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -86,7 +86,7 @@ app.include_router(users.router)
 def root():
     """根路径"""
     return {
-        "message": "欢迎使用 星途招生系统 API",
+        "message": "欢迎使用 展会智能助手后台管理系统 API",
         "version": "1.0.0",
         "docs": "/docs"
     }
@@ -103,7 +103,7 @@ def metrics():
     """系统指标端点（防止404错误）"""
     return {
         "status": "ok",
-        "service": "星途招生系统",
+        "service": "展会智能助手",
         "version": "1.0.0",
         "uptime": "运行中"
     }

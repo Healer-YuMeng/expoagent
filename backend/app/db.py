@@ -1153,10 +1153,10 @@ async def drop_legacy_mongo_tables() -> list[str]:
 
 async def create_default_teacher():
     database = get_database()
-    logger.info("检查是否需要创建默认教师账号...")
-    teacher_exists = await database.users.find_one({"role": "teacher"})
+    logger.info("检查是否需要创建默认销售账号...")
+    teacher_exists = await database.users.find_one({"role": {"$in": ["teacher", "sales"]}})
     if teacher_exists:
-        logger.info("ℹ️  教师账号已存在，跳过创建")
+        logger.info("ℹ️  销售账号已存在，跳过创建")
         return
 
     from .models.user import UserSchema
@@ -1164,15 +1164,15 @@ async def create_default_teacher():
     default_teacher = UserSchema(
         phone="13800138001",
         password_hash=UserSchema.hash_password("teacher123456"),
-        role="teacher",
-        name="默认老师",
+        role="sales",
+        name="默认销售",
         is_active=True,
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
     )
     teacher_dict = default_teacher.model_dump(by_alias=True, exclude=["id"])
     await database.users.insert_one(teacher_dict)
-    logger.info("✅ 默认教师账号创建成功")
+    logger.info("✅ 默认销售账号创建成功")
 
 
 async def ensure_default_admin_accounts():
@@ -1183,8 +1183,8 @@ async def ensure_default_admin_accounts():
         {
             "phone": "admin",
             "password": "admin",
-            "role": "school_admin",
-            "name": "默认学校管理员",
+            "role": "admin",
+            "name": "默认普通管理员",
             "school_id": "default_school",
             "school_name": "默认学校",
             "reset_if_exists": True,
@@ -1201,8 +1201,8 @@ async def ensure_default_admin_accounts():
         {
             "phone": "13800000002",
             "password": "123456",
-            "role": "school_admin",
-            "name": "默认学校管理员",
+            "role": "admin",
+            "name": "默认普通管理员",
             "school_id": "default_school",
             "school_name": "默认学校",
             "reset_if_exists": False,

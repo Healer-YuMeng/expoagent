@@ -39,21 +39,21 @@ class PromptUpdateRequest(BaseModel):
 async def get_prompt(
     key: str,
     locale: Optional[str] = Query(default=None, description="可选语言代码"),
-    school_id: Optional[str] = Query(default=None, description="学校ID，school_admin 自动限定为自身学校"),
+    school_id: Optional[str] = Query(default=None, description="学校ID，普通管理员自动限定为自身学校"),
     assistant_id: Optional[str] = Query(default=None, description="助手ID"),
     current_user: UserSchema = Depends(get_current_admin),
     db: PostgresCompatDatabase = Depends(get_database),
 ):
     prompt_service = get_prompt_service()
     scope_school = school_id
-    if current_user.role == "school_admin":
+    if current_user.role == "admin":
         scope_school = current_user.school_id
     scope_assistant = assistant_id
     if assistant_id:
         assistant = await AssistantService(db).get_assistant(assistant_id)
         if not assistant:
             raise HTTPException(status_code=404, detail="助手不存在")
-        if current_user.role == "school_admin" and assistant.get("school_id") != current_user.school_id:
+        if current_user.role == "admin" and assistant.get("school_id") != current_user.school_id:
             raise HTTPException(status_code=403, detail="无权访问其他学校助手")
         scope_school = assistant.get("school_id") or scope_school
     result = await prompt_service.get_prompt_with_meta(
@@ -89,7 +89,7 @@ async def update_prompt(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="content 不能为空",
         )
-    if current_user.role == "school_admin":
+    if current_user.role == "admin":
         scope_school = current_user.school_id
     else:
         scope_school = payload.school_id
@@ -98,7 +98,7 @@ async def update_prompt(
         assistant = await AssistantService(db).get_assistant(scope_assistant)
         if not assistant:
             raise HTTPException(status_code=404, detail="助手不存在")
-        if current_user.role == "school_admin" and assistant.get("school_id") != current_user.school_id:
+        if current_user.role == "admin" and assistant.get("school_id") != current_user.school_id:
             raise HTTPException(status_code=403, detail="无权操作其他学校助手")
         scope_school = assistant.get("school_id") or scope_school
     prompt_service = get_prompt_service()

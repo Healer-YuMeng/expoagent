@@ -22,6 +22,9 @@ request.interceptors.request.use(
       ? new URL(rawUrl).pathname
       : rawUrl;
     const isParentApi = normalizedUrl.startsWith('/v1/parent') || normalizedUrl.startsWith('/api/v1/parent');
+    if (!isParentApi && !authStore.ensureValidSession()) {
+      return Promise.reject(new Error('登录会话已过期，请重新登录'));
+    }
     const bearerToken = isParentApi ? authStore.getParentAccessToken() : authStore.token;
 
     if (bearerToken) {

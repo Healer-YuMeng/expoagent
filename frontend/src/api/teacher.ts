@@ -39,50 +39,50 @@ export interface TranslateResponse {
  * 获取老师工作台摘要数据
  */
 export function getTeacherDashboard(): Promise<DashboardStats> {
-  return request.get('/v1/teacher/dashboard');
+  return request.get('/v1/expo-system/dashboard');
 }
 
 export function getWelcomeMessage(): Promise<WelcomeMessageResponse> {
-  return request.get('/v1/teacher/settings/welcome-message');
+  return request.get('/v1/expo-system/settings/welcome-message');
 }
 
 export function updateWelcomeMessage(data: { messages: Record<string, string> }): Promise<WelcomeMessageResponse> {
-  return request.put('/v1/teacher/settings/welcome-message', data);
+  return request.put('/v1/expo-system/settings/welcome-message', data);
 }
 
 export function translateWelcomeMessage(data: TranslateRequest): Promise<TranslateResponse> {
-  return request.post('/v1/teacher/settings/welcome-message/translate', data, {
+  return request.post('/v1/expo-system/settings/welcome-message/translate', data, {
     timeout: 120000,
   });
 }
 
 export function getManualCallbacks(): Promise<{ items: ManualCallbackItem[] }> {
-  return request.get('/v1/teacher/manual-callbacks');
+  return request.get('/v1/expo-system/manual-callbacks');
 }
 
 export function deleteManualCallback(conversationId: string): Promise<{ message: string }> {
-  return request.delete(`/v1/teacher/manual-callbacks/${conversationId}`);
+  return request.delete(`/v1/expo-system/manual-callbacks/${conversationId}`);
 }
 
 export function getTeacherConversationMessages(
   conversationId: string,
   params?: { page?: number; page_size?: number }
 ): Promise<{ items: Message[]; total: number; ai_reply_enabled: boolean }> {
-  return request.get(`/v1/teacher/conversations/${conversationId}/messages`, { params });
+  return request.get(`/v1/expo-system/conversations/${conversationId}/messages`, { params });
 }
 
 export function sendTeacherConversationMessage(
   conversationId: string,
   data: { content: string },
 ): Promise<Message> {
-  return request.post(`/v1/teacher/conversations/${conversationId}/messages`, data);
+  return request.post(`/v1/expo-system/conversations/${conversationId}/messages`, data);
 }
 
 export function updateTeacherConversationAiReply(
   conversationId: string,
   enabled: boolean,
 ): Promise<{ conversation_id: string; ai_reply_enabled: boolean }> {
-  return request.patch(`/v1/teacher/conversations/${conversationId}/ai-reply`, { enabled });
+  return request.patch(`/v1/expo-system/conversations/${conversationId}/ai-reply`, { enabled });
 }
 
 // --------- 系统提示词 ---------
@@ -153,7 +153,7 @@ export function listKnowledgeBases(school_id?: string | null): Promise<{ items: 
 export interface ManagedUser {
   id: string;
   phone: string;
-  role: 'teacher' | 'school_admin';
+  role: 'sales' | 'admin';
   name?: string;
   email?: string;
   is_active?: boolean;
@@ -169,7 +169,7 @@ export function listManagedUsers(role?: string): Promise<{ items: ManagedUser[] 
 export function createManagedUser(payload: {
   phone: string;
   password: string;
-  role: 'teacher' | 'school_admin';
+  role: 'sales' | 'admin';
   name?: string;
   email?: string;
   school_id?: string | null;

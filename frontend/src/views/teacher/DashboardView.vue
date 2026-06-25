@@ -1,62 +1,52 @@
 <template>
   <div class="dashboard-container">
-    <!-- 统计卡片 - 四个卡片同一行 -->
     <div class="stats-grid">
-      <div 
-        class="stat-card glass"
-        v-loading="loading"
-      >
-        <div class="stat-icon">📊</div>
+      <div class="stat-card" v-loading="loading">
+        <div class="stat-icon-panel slate">
+          <el-icon class="stat-icon"><Histogram /></el-icon>
+        </div>
         <div class="stat-label">{{ t('dashboard.todayConsultations') }}</div>
         <div class="stat-value">{{ stats?.today_consultations || 0 }}</div>
       </div>
 
-      <div 
-        class="stat-card glass"
-        v-loading="loading"
-      >
-        <div class="stat-icon">✅</div>
+      <div class="stat-card" v-loading="loading">
+        <div class="stat-icon-panel success">
+          <el-icon class="stat-icon"><CircleCheck /></el-icon>
+        </div>
         <div class="stat-label">{{ t('dashboard.validLeads') }}</div>
         <div class="stat-value">{{ stats?.valid_leads || 0 }}</div>
       </div>
 
-      <div 
-        class="stat-card glass clickable"
-        v-loading="loading"
-        @click="goToHighPriority"
-      >
-        <div class="stat-icon">🔥</div>
+      <div class="stat-card clickable" v-loading="loading" @click="goToHighPriority">
+        <div class="stat-icon-panel accent">
+          <el-icon class="stat-icon"><Opportunity /></el-icon>
+        </div>
         <div class="stat-label">{{ t('dashboard.urgentFollowups') }}</div>
         <div class="stat-value-container">
           <div class="stat-value">{{ stats?.urgent_followups || 0 }}</div>
-          <span class="stat-badge danger">{{ t('dashboard.highPriorityBadge') }}</span>
+          <span class="stat-badge neutral">{{ t('dashboard.highPriorityBadge') }}</span>
         </div>
       </div>
 
-      <div 
-        class="stat-card glass clickable"
-        v-loading="loading"
-        @click="goToManualCallbacks"
-      >
-        <div class="stat-icon">⚠️</div>
+      <div class="stat-card clickable" v-loading="loading" @click="goToManualCallbacks">
+        <div class="stat-icon-panel warning">
+          <el-icon class="stat-icon"><Warning /></el-icon>
+        </div>
         <div class="stat-label">{{ t('dashboard.manualCallbacks') }}</div>
         <div class="stat-value-container">
           <div class="stat-value">{{ stats?.manual_callbacks || 0 }}</div>
-          <span class="stat-badge danger">{{ t('dashboard.manualBadge') }}</span>
+          <span class="stat-badge neutral">{{ t('dashboard.manualBadge') }}</span>
         </div>
       </div>
     </div>
 
-    <!-- 错误提示 -->
-    <div v-if="error" class="error-alert glass">
-      <div class="error-icon">⚠️</div>
+    <div v-if="error" class="error-alert">
+      <el-icon class="error-icon"><Warning /></el-icon>
       <div class="error-text">{{ error }}</div>
     </div>
 
-    <!-- 图表区域 -->
     <div class="charts-section">
-      <!-- 左侧：咨询来源柱状图 -->
-      <div class="chart-card glass">
+      <div class="chart-card">
         <div class="chart-header">
           <h3 class="chart-title">{{ t('dashboard.consultationSource') }}</h3>
           <div class="chart-actions">
@@ -72,9 +62,8 @@
         </div>
         <div ref="sourceChartRef" class="chart-container"></div>
       </div>
-      
-      <!-- 右侧：用户关注雷达图 -->
-      <div class="chart-card glass">
+
+      <div class="chart-card">
         <div class="chart-header">
           <h3 class="chart-title">{{ t('dashboard.userFocus') }}</h3>
         </div>
@@ -85,18 +74,22 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, onUnmounted, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useDashboardStore } from '@/stores/dashboard';
 import { useI18n } from 'vue-i18n';
+import { CircleCheck, Histogram, Opportunity, Warning } from '@element-plus/icons-vue';
 import * as echarts from 'echarts';
 import type { ECharts } from 'echarts';
+import { useAuthStore } from '@/stores/auth';
+import { getPortalPath } from '@/router/portalRoutes';
 
 const dashboardStore = useDashboardStore();
 const { t, locale } = useI18n();
 const { stats, loading, error } = storeToRefs(dashboardStore);
 const router = useRouter();
+const authStore = useAuthStore();
 
 const sourceChartRef = ref<HTMLElement>();
 const radarChartRef = ref<HTMLElement>();
@@ -120,8 +113,6 @@ onMounted(() => {
   dashboardStore.fetchDashboardStats();
   initSourceChart();
   initRadarChart();
-  
-  // 监听窗口大小变化
   window.addEventListener('resize', handleResize);
 });
 
@@ -163,77 +154,85 @@ const handleResize = () => {
   }
 };
 
+const baseTooltip = {
+  backgroundColor: 'rgba(255, 255, 255, 0.98)',
+  borderColor: '#dbe3ee',
+  borderWidth: 1,
+  textStyle: {
+    color: '#243041',
+  },
+};
+
 const initSourceChart = () => {
   if (!sourceChartRef.value) return;
-  
+
   sourceChart = echarts.init(sourceChartRef.value);
-  
-  const option = {
+
+  sourceChart.setOption({
     tooltip: {
+      ...baseTooltip,
       trigger: 'axis',
       axisPointer: {
-        type: 'shadow'
+        type: 'shadow',
       },
-      backgroundColor: 'rgba(255, 255, 255, 0.9)',
-      borderColor: 'rgba(255, 255, 255, 0.4)',
-      borderWidth: 1,
-      textStyle: {
-        color: '#2c3e50'
-      }
     },
     legend: {
       data: [t('dashboard.visit'), t('dashboard.appointment')],
       top: 10,
-      right: 20,
+      right: 18,
       textStyle: {
-        color: 'rgba(44, 62, 80, 0.8)',
-        fontSize: 13
+        color: '#6a7890',
+        fontSize: 13,
+        fontWeight: 600,
       },
-      itemWidth: 20,
-      itemHeight: 12
+      itemWidth: 16,
+      itemHeight: 10,
+      itemGap: 18,
     },
     grid: {
-      left: '3%',
+      left: '4%',
       right: '4%',
-      bottom: '3%',
-      top: '50px',
-      containLabel: true
+      bottom: '4%',
+      top: '54px',
+      containLabel: true,
     },
     xAxis: {
       type: 'category',
       data: getChannelLabels(),
       axisLine: {
         lineStyle: {
-          color: 'rgba(44, 62, 80, 0.3)'
-        }
+          color: '#d9e1ec',
+        },
       },
       axisLabel: {
-        color: 'rgba(44, 62, 80, 0.8)',
+        color: '#6b7a90',
         fontSize: 13,
         interval: 0,
-        rotate: 0
-      }
+      },
+      axisTick: {
+        show: false,
+      },
     },
     yAxis: {
       type: 'value',
       minInterval: 1,
       axisLine: {
-        show: false
+        show: false,
       },
       axisTick: {
-        show: false
+        show: false,
       },
       axisLabel: {
-        color: 'rgba(44, 62, 80, 0.6)',
+        color: '#8b97aa',
         fontSize: 12,
-        formatter: (value: number) => Math.round(value).toString()
+        formatter: (value: number) => Math.round(value).toString(),
       },
       splitLine: {
         lineStyle: {
-          color: 'rgba(44, 62, 80, 0.1)',
-          type: 'dashed'
-        }
-      }
+          color: '#edf2f8',
+          type: 'dashed',
+        },
+      },
     },
     series: [
       {
@@ -244,25 +243,25 @@ const initSourceChart = () => {
         itemStyle: {
           borderRadius: [8, 8, 0, 0],
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(52, 152, 219, 0.9)' },
-            { offset: 1, color: 'rgba(52, 152, 219, 0.6)' }
-          ])
+            { offset: 0, color: '#94a3b8' },
+            { offset: 1, color: '#7c8ea7' },
+          ]),
         },
         emphasis: {
           itemStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(52, 152, 219, 1)' },
-              { offset: 1, color: 'rgba(52, 152, 219, 0.8)' }
-            ])
-          }
+              { offset: 0, color: '#7f90a8' },
+              { offset: 1, color: '#6d7f98' },
+            ]),
+          },
         },
         label: {
           show: true,
           position: 'top',
-          color: 'rgba(44, 62, 80, 0.8)',
+          color: '#4e5b6d',
           fontSize: 12,
-          fontWeight: 600
-        }
+          fontWeight: 600,
+        },
       },
       {
         name: t('dashboard.appointment'),
@@ -272,30 +271,29 @@ const initSourceChart = () => {
         itemStyle: {
           borderRadius: [8, 8, 0, 0],
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(46, 204, 113, 0.9)' },
-            { offset: 1, color: 'rgba(46, 204, 113, 0.6)' }
-          ])
+            { offset: 0, color: '#7ee0b0' },
+            { offset: 1, color: '#5ecf9d' },
+          ]),
         },
         emphasis: {
           itemStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(46, 204, 113, 1)' },
-              { offset: 1, color: 'rgba(46, 204, 113, 0.8)' }
-            ])
-          }
+              { offset: 0, color: '#6fd6a8' },
+              { offset: 1, color: '#4ebd8d' },
+            ]),
+          },
         },
         label: {
           show: true,
           position: 'top',
-          color: 'rgba(44, 62, 80, 0.8)',
+          color: '#4e5b6d',
           fontSize: 12,
-          fontWeight: 600
-        }
-      }
-    ]
-  };
-  
-  sourceChart.setOption(option);
+          fontWeight: 600,
+        },
+      },
+    ],
+  });
+
   updateSourceChart();
 };
 
@@ -317,7 +315,7 @@ const getRadarIndicators = () => [
   { name: t('dashboard.food'), max: 100 },
   { name: t('dashboard.accommodation'), max: 100 },
   { name: t('dashboard.facilities'), max: 100 },
-  { name: t('dashboard.tuition'), max: 100 }
+  { name: t('dashboard.tuition'), max: 100 },
 ];
 
 const getRadarSeriesItem = () => ({
@@ -325,26 +323,26 @@ const getRadarSeriesItem = () => ({
   name: t('dashboard.userAttention'),
   areaStyle: {
     color: new echarts.graphic.RadialGradient(0.5, 0.5, 1, [
-      { offset: 0, color: 'rgba(52, 152, 219, 0.3)' },
-      { offset: 1, color: 'rgba(52, 152, 219, 0.1)' }
-    ])
+      { offset: 0, color: 'rgba(148, 163, 184, 0.28)' },
+      { offset: 1, color: 'rgba(148, 163, 184, 0.08)' },
+    ]),
   },
   lineStyle: {
-    color: 'rgba(52, 152, 219, 0.9)',
-    width: 2.5
+    color: '#7d8ea7',
+    width: 2.5,
   },
   itemStyle: {
-    color: 'rgba(52, 152, 219, 1)',
-    borderColor: '#fff',
-    borderWidth: 2
+    color: '#7d8ea7',
+    borderColor: '#ffffff',
+    borderWidth: 2,
   },
   label: {
     show: true,
     formatter: (params: any) => params.value,
-    color: 'rgba(44, 62, 80, 0.8)',
+    color: '#526071',
     fontSize: 13,
-    fontWeight: 600
-  }
+    fontWeight: 600,
+  },
 });
 
 const updateSourceChart = () => {
@@ -363,18 +361,13 @@ const updateSourceChart = () => {
 
 const initRadarChart = () => {
   if (!radarChartRef.value) return;
-  
+
   radarChart = echarts.init(radarChartRef.value);
-  
-  const option = {
+
+  radarChart.setOption({
     tooltip: {
+      ...baseTooltip,
       trigger: 'item',
-      backgroundColor: 'rgba(255, 255, 255, 0.9)',
-      borderColor: 'rgba(255, 255, 255, 0.4)',
-      borderWidth: 1,
-      textStyle: {
-        color: '#2c3e50'
-      }
     },
     radar: {
       indicator: getRadarIndicators(),
@@ -383,42 +376,40 @@ const initRadarChart = () => {
       radius: '68%',
       center: ['50%', '52%'],
       axisName: {
-        color: 'rgba(44, 62, 80, 0.8)',
+        color: '#5d6c82',
         fontSize: 15,
-        fontWeight: 500
+        fontWeight: 600,
       },
       splitLine: {
         lineStyle: {
-          color: 'rgba(44, 62, 80, 0.15)'
-        }
+          color: '#dde5ef',
+        },
       },
       splitArea: {
         show: true,
         areaStyle: {
           color: [
-            'rgba(52, 152, 219, 0.05)',
-            'rgba(52, 152, 219, 0.1)',
-            'rgba(52, 152, 219, 0.15)',
-            'rgba(52, 152, 219, 0.2)'
-          ]
-        }
+            'rgba(148, 163, 184, 0.05)',
+            'rgba(148, 163, 184, 0.08)',
+            'rgba(148, 163, 184, 0.12)',
+            'rgba(148, 163, 184, 0.16)',
+          ],
+        },
       },
       axisLine: {
         lineStyle: {
-          color: 'rgba(44, 62, 80, 0.2)'
-        }
-      }
+          color: '#d6deea',
+        },
+      },
     },
     series: [
       {
         name: t('dashboard.attention'),
         type: 'radar',
-        data: [getRadarSeriesItem()]
-      }
-    ]
-  };
-  
-  radarChart.setOption(option);
+        data: [getRadarSeriesItem()],
+      },
+    ],
+  });
 };
 
 const updateRadarChart = () => {
@@ -431,150 +422,176 @@ const updateRadarChart = () => {
       {
         name: t('dashboard.attention'),
         type: 'radar',
-        data: [getRadarSeriesItem()]
-      }
-    ]
+        data: [getRadarSeriesItem()],
+      },
+    ],
   });
 };
 
 const goToHighPriority = () => {
-  router.push({ name: 'HighIntentLeads' });
+  router.push({
+    path: getPortalPath(authStore.userRole, 'leads'),
+    query: { high_intent_only: 'true' },
+  });
 };
 
 const goToManualCallbacks = () => {
-  router.push({ name: 'ManualCallbacks' });
+  router.push(getPortalPath(authStore.userRole, 'manualCallbacks'));
 };
 </script>
 
 <style scoped>
 .dashboard-container {
-  padding: 0;
+  padding: 4px 6px 10px;
 }
 
-/* 毛玻璃效果 */
-.glass {
-  background: rgba(255, 255, 255, 0.25);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
-}
-
-/* 统计卡片网格 - 四个卡片同一行 */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 15px;
-  margin-bottom: 20px;
+  gap: 18px;
+  margin-bottom: 22px;
 }
 
-/* 统计卡片 */
 .stat-card {
-  padding: 25px 20px;
-  border-radius: 20px;
-  transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  padding: 28px 28px 26px;
+  border: 1px solid #e5e9ef;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
 }
 
 .stat-card:hover {
-  background: rgba(255, 255, 255, 0.35);
-  transform: translateY(-5px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+  border-color: #d8dee6;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.07);
 }
 
 .stat-card.clickable {
   cursor: pointer;
 }
 
+.stat-icon-panel {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 18px;
+  place-items: center;
+  border-radius: 16px;
+}
+
+.stat-icon-panel.slate {
+  background: #f4f6f8;
+  color: #303948;
+}
+
+.stat-icon-panel.success {
+  background: #f4f6f8;
+  color: #4f5f72;
+}
+
+.stat-icon-panel.accent {
+  background: #f4f6f8;
+  color: #4f5f72;
+}
+
+.stat-icon-panel.warning {
+  background: #f4f6f8;
+  color: #4f5f72;
+}
+
 .stat-icon {
-  font-size: 32px;
-  margin-bottom: 12px;
+  font-size: 26px;
 }
 
 .stat-label {
-  font-size: 13px;
-  color: rgba(44, 62, 80, 0.7);
-  margin-bottom: 10px;
-  font-weight: 500;
+  margin-bottom: 14px;
+  color: #6d7c91;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .stat-value {
-  font-size: 32px;
+  color: #1f2937;
+  font-size: 58px;
   font-weight: 700;
-  color: #2c3e50;
   line-height: 1;
+  letter-spacing: -0.04em;
 }
 
 .stat-value-container {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .stat-badge {
-  padding: 4px 10px;
-  border-radius: 10px;
-  font-size: 11px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 13px;
   font-weight: 600;
 }
 
-.stat-badge.danger {
-  background: rgba(231, 76, 60, 0.3);
-  color: #c0392b;
+.stat-badge.neutral {
+  background: #eef1f5;
+  color: #617286;
 }
 
-.stat-badge.warning {
-  background: rgba(241, 196, 15, 0.3);
-  color: #f39c12;
-}
-
-/* 错误提示 */
 .error-alert {
-  margin-bottom: 20px;
-  padding: 20px 25px;
-  border-radius: 15px;
   display: flex;
   align-items: center;
-  gap: 15px;
-  border-left: 4px solid #e74c3c;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding: 18px 22px;
+  border: 1px solid #ecd7d3;
+  border-radius: 18px;
+  background: #fffafa;
 }
 
 .error-icon {
-  font-size: 24px;
+  color: #d26a5c;
+  font-size: 20px;
 }
 
 .error-text {
-  color: #c0392b;
-  font-weight: 500;
   flex: 1;
+  color: #b65449;
+  font-weight: 600;
 }
 
-/* 图表区域 */
 .charts-section {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-top: 20px;
+  gap: 18px;
 }
 
 .chart-card {
-  padding: 30px;
-  border-radius: 20px;
+  padding: 30px 34px;
+  border: 1px solid #e5e9ef;
+  border-radius: 26px;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
 }
 
 .chart-header {
-  margin-bottom: 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
 .chart-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #2c3e50;
   margin: 0;
+  color: #1f2937;
+  font-size: 20px;
+  font-weight: 700;
 }
 
 .chart-actions {
@@ -583,20 +600,27 @@ const goToManualCallbacks = () => {
 }
 
 .period-btn {
-  border: 1px solid rgba(44, 62, 80, 0.2);
+  min-width: 60px;
+  padding: 10px 15px;
+  border: 1px solid #dde3ea;
   border-radius: 999px;
-  padding: 6px 14px;
-  background: transparent;
-  cursor: pointer;
-  font-size: 12px;
+  background: #ffffff;
+  color: #66778e;
+  font-size: 14px;
   font-weight: 600;
-  color: rgba(44, 62, 80, 0.7);
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .period-btn.active {
-  background: rgba(52, 152, 219, 0.15);
-  border-color: rgba(52, 152, 219, 0.4);
-  color: #2980b9;
+  border-color: #222f40;
+  background: #222f40;
+  box-shadow: 0 8px 16px rgba(34, 47, 64, 0.18);
+  color: #ffffff;
 }
 
 .chart-container {
@@ -604,7 +628,6 @@ const goToManualCallbacks = () => {
   height: 450px;
 }
 
-/* 响应式设计 */
 @media (max-width: 1600px) {
   .stats-grid {
     grid-template-columns: repeat(3, 1fr);
@@ -615,25 +638,21 @@ const goToManualCallbacks = () => {
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  
+
   .charts-section {
     grid-template-columns: 1fr;
   }
-  
+
   .stat-card {
-    padding: 20px 18px;
+    padding: 24px 22px;
   }
-  
-  .stat-icon {
-    font-size: 28px;
-  }
-  
+
   .stat-label {
-    font-size: 12px;
+    font-size: 14px;
   }
-  
+
   .stat-value {
-    font-size: 28px;
+    font-size: 48px;
   }
 }
 
@@ -642,58 +661,58 @@ const goToManualCallbacks = () => {
     grid-template-columns: 1fr 1fr;
     gap: 12px;
   }
-  
+
   .stat-card {
-    padding: 18px 15px;
+    padding: 22px 18px;
   }
-  
-  .stat-icon {
-    font-size: 26px;
-    margin-bottom: 8px;
-  }
-  
+
   .stat-value {
-    font-size: 24px;
+    font-size: 42px;
   }
-  
+
   .stat-badge {
-    font-size: 10px;
-    padding: 3px 8px;
+    padding: 6px 10px;
+    font-size: 12px;
   }
 }
 
 @media (max-width: 768px) {
+  .dashboard-container {
+    padding: 0;
+  }
+
   .stats-grid {
     grid-template-columns: 1fr;
     gap: 12px;
   }
-  
+
   .stat-card {
-    padding: 20px;
+    padding: 22px 20px;
   }
-  
-  .stat-icon {
-    font-size: 32px;
-  }
-  
+
   .stat-label {
-    font-size: 13px;
+    font-size: 14px;
   }
-  
+
   .stat-value {
-    font-size: 32px;
+    font-size: 44px;
   }
-  
+
   .chart-card {
-    padding: 20px;
+    padding: 24px 18px;
   }
-  
+
   .chart-container {
     height: 320px;
   }
-  
+
   .chart-title {
     font-size: 16px;
+  }
+
+  .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

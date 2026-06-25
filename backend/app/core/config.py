@@ -151,7 +151,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     
     # Token 过期时间（分钟）
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7天 = 7 * 24 * 60
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 720  # 12小时 = 12 * 60
 
     # ========== CORS 配置 ==========
     # 允许的跨域来源（支持 JSON 数组字符串或 Python List）

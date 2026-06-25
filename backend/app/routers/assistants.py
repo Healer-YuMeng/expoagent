@@ -27,7 +27,7 @@ class AssistantUpdateRequest(BaseModel):
 
 
 def _resolve_school_scope(current_user: UserSchema, requested_school_id: Optional[str]) -> str:
-    if current_user.role == "school_admin":
+    if current_user.role == "admin":
         if not current_user.school_id:
             raise HTTPException(status_code=400, detail="管理员未绑定学校")
         return current_user.school_id
@@ -81,7 +81,7 @@ async def update_assistant(
     assistant = await service.get_assistant(assistant_id)
     if not assistant:
         raise HTTPException(status_code=404, detail="助手不存在")
-    if current_user.role == "school_admin" and assistant.get("school_id") != current_user.school_id:
+    if current_user.role == "admin" and assistant.get("school_id") != current_user.school_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权操作其他学校助手")
 
     knowledge_base_ids: Optional[list[str]] = None

@@ -38,7 +38,7 @@
             <input v-model="form.school_name" :placeholder="t('teacher.users.optionalPlaceholder')" />
           </label>
         </template>
-        <div class="hint">{{ t('teacher.users.roleLabel') }}：{{ getRoleText(isSuperAdmin ? 'school_admin' : 'teacher') }}</div>
+        <div class="hint">{{ t('teacher.users.roleLabel') }}：{{ getRoleText(isSuperAdmin ? 'admin' : 'sales') }}</div>
       </div>
     </section>
 
@@ -99,7 +99,7 @@ const form = ref({
 });
 
 const getRoleText = (role: string) => {
-  if (role === 'school_admin') {
+  if (role === 'admin') {
     return t('teacher.users.roleSchoolAdmin');
   }
   return t('teacher.users.roleTeacher');
@@ -129,7 +129,7 @@ const createUser = async () => {
     await createManagedUser({
       phone: form.value.phone,
       password: form.value.password,
-      role: isSuperAdmin.value ? 'school_admin' : 'teacher',
+      role: isSuperAdmin.value ? 'admin' : 'sales',
       name: form.value.name || undefined,
       email: form.value.email || undefined,
       school_id: isSuperAdmin.value ? form.value.school_id : undefined,

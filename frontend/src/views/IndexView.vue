@@ -29,28 +29,36 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import QRCode from 'qrcode';
 import PaintBackground from '@/components/PaintBackground.vue';
-import { captureSourceFromQuery, shouldTrackVisit } from '@/utils/channelSource';
+import { buildStartChatEntryUrl, captureSourceFromQuery, shouldTrackVisit } from '@/utils/channelSource';
 import { trackChannelVisit } from '@/api/channelMetrics';
 import { getAppStorageItem } from '@/utils/browserStorage';
-
-const PUBLIC_CHAT_URL = 'http://101.35.111.34:8606/?assistant_id=fea1734f-c2e5-4bd0-aadc-61b69a11d88b';
 
 const router = useRouter();
 const route = useRoute();
 const { locale } = useI18n();
 const qrCodeDataUrl = ref('');
 
+const chatEntryUrl = computed(() => {
+  const params: Record<string, string> = {};
+  Object.entries(route.query).forEach(([key, value]) => {
+    if (typeof value === 'string' && value.trim()) {
+      params[key] = value;
+    }
+  });
+  return buildStartChatEntryUrl(window.location.origin, params);
+});
+
 function goToChat() {
   router.push({ name: 'StartChat', query: route.query });
 }
 
 onMounted(() => {
-  QRCode.toDataURL(PUBLIC_CHAT_URL, {
+  QRCode.toDataURL(chatEntryUrl.value, {
     width: 220,
     margin: 1,
   })

@@ -4,22 +4,42 @@ import { login as loginApi, createAnonymousSession } from '@/api/auth';
 import type { User, LoginRequest, AnonymousSessionResponse } from '@/types';
 import router from '@/router';
 import { getAppStorageItem, removeAppStorageItem, setAppStorageItem } from '@/utils/browserStorage';
+import { getPortalHomePath } from '@/router/portalRoutes';
+import {
+  isSessionExpired,
+  parseSessionTimestamp,
+  resolvePostLoginPath,
+} from '@/utils/authSession';
+import {
+  clearAdminAuthStorage,
+  loadAdminAuthStorage,
+  persistAdminAuthStorage,
+} from '@/utils/adminAuthStorage';
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string | null>(localStorage.getItem('ycis_token'));
-  const user = ref<User | null>(JSON.parse(localStorage.getItem('ycis_user') || 'null'));
+  const adminAuthSnapshot = loadAdminAuthStorage(window.sessionStorage, window.localStorage);
+  const token = ref<string | null>(adminAuthSnapshot.token);
+  const user = ref<User | null>(JSON.parse(adminAuthSnapshot.userJson || 'null'));
+  const loginAt = ref<number | null>(parseSessionTimestamp(adminAuthSnapshot.loginAt));
   const parentToken = ref<string | null>(getAppStorageItem('ycis_parent_token'));
   const parentUser = ref<User | null>(JSON.parse(getAppStorageItem('ycis_parent_user') || 'null'));
   const anonymousId = ref<string | null>(getAppStorageItem('ycis_anonymous_id'));
 
-  const isAuthenticated = computed(() => !!token.value && !!user.value);
+  const isAuthenticated = computed(() => !!token.value && !!user.value && !isSessionExpired(loginAt.value));
   const userRole = computed(() => user.value?.role);
 
   function setAuth(t: string, u: User) {
+    const now = Date.now();
     token.value = t;
     user.value = u;
-    localStorage.setItem('ycis_token', t);
-    localStorage.setItem('ycis_user', JSON.stringify(u));
+    loginAt.value = now;
+    persistAdminAuthStorage(
+      window.sessionStorage,
+      window.localStorage,
+      t,
+      JSON.stringify(u),
+      now,
+    );
   }
 
   function setParentAuth(t: string, u: User) {
@@ -32,8 +52,8 @@ export const useAuthStore = defineStore('auth', () => {
   function clearAuth() {
     token.value = null;
     user.value = null;
-    localStorage.removeItem('ycis_token');
-    localStorage.removeItem('ycis_user');
+    loginAt.value = null;
+    clearAdminAuthStorage(window.sessionStorage, window.localStorage);
   }
 
   function clearParentAuth() {
@@ -55,16 +75,29 @@ export const useAuthStore = defineStore('auth', () => {
     return null;
   }
 
-  async function login(credentials: LoginRequest) {
+  function hasSessionExpired(now = Date.now()) {
+    return !!token.value && !!user.value && isSessionExpired(loginAt.value, now);
+  }
+
+  function ensureValidSession() {
+    if (!hasSessionExpired()) {
+      return true;
+    }
+    clearAuth();
+    return false;
+  }
+
+  async function login(credentials: LoginRequest, redirectPath?: string | null) {
     try {
       const response = await loginApi(credentials);
       setAuth(response.access_token, response.user);
       
       // 根据角色跳转到不同页面
-      if (response.user.role === 'teacher' || response.user.role === 'school_admin' || response.user.role === 'super_admin') {
-        router.push({ name: 'Dashboard' });
+      if (response.user.role === 'sales' || response.user.role === 'admin' || response.user.role === 'super_admin') {
+        const fallbackPath = getPortalHomePath(response.user.role);
+        router.push(resolvePostLoginPath(redirectPath, fallbackPath));
       } else {
-        router.push('/parent/conversations');
+        router.push('/start-chat');
       }
     } catch (error) {
       console.error('Login failed:', error);
@@ -102,14 +135,21 @@ export const useAuthStore = defineStore('auth', () => {
     router.push('/auth/login');
   }
 
+  if (token.value && user.value) {
+    ensureValidSession();
+  }
+
   return {
     token,
     user,
+    loginAt,
     parentToken,
     parentUser,
     anonymousId,
     isAuthenticated,
     userRole,
+    hasSessionExpired,
+    ensureValidSession,
     login,
     initializeAnonymousSession,
     ensureParentSession,
