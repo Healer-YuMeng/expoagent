@@ -6,7 +6,7 @@ import asyncio
 import json
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import Any, Optional, List, AsyncGenerator, Sequence
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -29,7 +29,6 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/parent", tags=["家长端"])
-AI_REPLY_AUTO_RESUME_DELAY_SECONDS = 300
 
 
 # ========== 请求/响应模型 ==========
@@ -121,49 +120,11 @@ PROFILE_COLLECTION = "conversation_profiles"
 SYSTEM_SETTINGS_COLLECTION = "system_settings"
 
 
-def _normalize_utc_naive_datetime(value: datetime | None) -> datetime | None:
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return value
-    return value.astimezone(timezone.utc).replace(tzinfo=None)
-
-
 async def _ensure_ai_reply_auto_resumed(
     db: PostgresCompatDatabase,
     conversation: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
-    if not conversation:
-        return conversation
-    if bool(conversation.get("ai_reply_enabled", True)):
-        return conversation
-    if not bool(conversation.get("ai_reply_auto_resume_pending", False)):
-        return conversation
-    disabled_at = conversation.get("ai_reply_disabled_at")
-    if not isinstance(disabled_at, datetime):
-        return conversation
-    disabled_at = _normalize_utc_naive_datetime(disabled_at)
-    if disabled_at is None:
-        return conversation
-    now = datetime.utcnow()
-    if (now - disabled_at).total_seconds() < AI_REPLY_AUTO_RESUME_DELAY_SECONDS:
-        return conversation
-    await db.conversations.update_one(
-        {"_id": conversation["_id"]},
-        {
-            "$set": {
-                "ai_reply_enabled": True,
-                "updated_at": now,
-                "ai_reply_auto_resume_pending": False,
-            },
-            "$unset": {
-                "ai_reply_disabled_at": "",
-            },
-        },
-    )
-    refreshed = await db.conversations.find_one({"_id": conversation["_id"]})
-    logger.info("Conversation %s lazily auto re-enabled AI reply after timeout", conversation.get("_id"))
-    return refreshed or conversation
+    return conversation
 WELCOME_MESSAGE_KEY = "chat_welcome_message"
 DEFAULT_WELCOME_SCOPE = "default_school"
 INVALID_CONTACT_PROMPTS = {

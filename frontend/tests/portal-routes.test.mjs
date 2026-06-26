@@ -29,10 +29,11 @@ function loadTsModule(relativePath) {
 }
 
 const {
+  getControlledPortalFeatureTarget,
   getPortalHomePath,
   getPortalPath,
   getParentConversationPath,
-  isSchoolAdminFeatureLocked,
+  isPortalFeatureLocked,
 } = loadTsModule('src/router/portalRoutes.ts');
 
 test('不同后台角色进入各自独立首页', () => {
@@ -54,12 +55,20 @@ test('家长对话链接改为 expoagent 前缀', () => {
   );
 });
 
-test('仅学校管理员的指定模块显示开发中蒙版', () => {
-  assert.equal(isSchoolAdminFeatureLocked('admin', '/expo-system/manual-callbacks'), true);
-  assert.equal(isSchoolAdminFeatureLocked('admin', '/expo-system/system-prompt'), true);
-  assert.equal(isSchoolAdminFeatureLocked('admin', '/expo-system/users'), true);
-  assert.equal(isSchoolAdminFeatureLocked('admin', '/expo-system/system-settings'), true);
-  assert.equal(isSchoolAdminFeatureLocked('admin', '/expo-system/leads'), false);
-  assert.equal(isSchoolAdminFeatureLocked('super_admin', '/admin-system/system-settings'), false);
-  assert.equal(isSchoolAdminFeatureLocked('sales', '/expo-system/user/system-settings'), false);
+test('功能开关只控制四个指定模块', () => {
+  const disabledModules = {
+    manualCallbacks: false,
+    systemPrompt: false,
+    userManagement: false,
+    systemSettings: false,
+  };
+
+  assert.equal(getControlledPortalFeatureTarget('super_admin', '/admin-system/system-settings'), 'systemSettings');
+  assert.equal(getControlledPortalFeatureTarget('admin', '/expo-system/manual-callbacks'), 'manualCallbacks');
+  assert.equal(getControlledPortalFeatureTarget('sales', '/expo-system/user/leads'), null);
+
+  assert.equal(isPortalFeatureLocked('admin', '/expo-system/manual-callbacks', disabledModules), true);
+  assert.equal(isPortalFeatureLocked('sales', '/expo-system/user/system-settings', disabledModules), true);
+  assert.equal(isPortalFeatureLocked('super_admin', '/admin-system/system-settings', disabledModules), false);
+  assert.equal(isPortalFeatureLocked('admin', '/expo-system/leads', disabledModules), false);
 });

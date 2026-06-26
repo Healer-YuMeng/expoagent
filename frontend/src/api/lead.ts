@@ -7,7 +7,6 @@ import type {
   PaginatedLeads,
   UpdateLeadRequest,
   AddFollowUpNoteRequest,
-  WecomStatus,
 } from '@/types';
 
 export interface UpdateFollowUpNoteRequest {
@@ -22,11 +21,13 @@ export interface LeadFilters {
   high_intent_only?: boolean;
   manual_callback_only?: boolean;
   search?: string;
+  intended_product?: string;
+  interest_level?: string;
+  follow_up_owner_name?: string;
   language?: string;
   tags?: string[];
   date?: string; // YYYY-MM-DD
   appointment_status?: string;
-  wecom_status?: WecomStatus;
 }
 
 /**
@@ -95,4 +96,12 @@ export function deleteFollowUpNote(
  */
 export function deleteLead(id: string): Promise<{ message: string }> {
   return request.delete(`/v1/leads/${id}`);
+}
+
+export function bulkDeleteLeads(leadIds: string[]): Promise<{ message: string; deleted_count: number }> {
+  return request.delete('/v1/leads', {
+    data: {
+      lead_ids: leadIds,
+    },
+  });
 }

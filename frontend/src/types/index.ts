@@ -78,6 +78,8 @@ export interface LeadListItem {
   display_name?: string;
   display_phone?: string;
   campus?: string;
+  intended_product?: string | null;
+  interest_level?: string | null;
   is_high_intent: boolean;
   needs_manual_callback: boolean;
   source?: string;

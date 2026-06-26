@@ -2,139 +2,213 @@
   <div class="leads-view">
     <!-- 页面标题 -->
     <div class="page-header">
-      <h1 class="page-title">📋 {{ t('leads.title') }}</h1>
-      <div class="header-actions">
-        <span class="total-count">{{ t('leads.totalCount', { count: total }) }}</span>
-      </div>
+      <h1 class="page-title">
+        <span>{{ t('leads.title') }}</span>
+        <span class="total-count total-count--inline">{{ t('leads.totalCount', { count: total }) }}</span>
+      </h1>
     </div>
 
     <!-- 快捷筛选按钮和搜索框 -->
-    <div class="filter-section glass">
+    <div class="filter-section">
       <div class="filter-row">
-        <!-- 快捷筛选按钮组 -->
         <div class="quick-filters">
-          <button 
-            class="quick-filter-btn" 
+          <button
+            class="quick-filter-btn"
             :class="{ active: isAllLeadsFilterActive() }"
             @click="quickFilter('all')"
           >
-            <span class="filter-icon">📋</span>
+            <el-icon class="filter-icon"><Tickets /></el-icon>
             <span>{{ t('leads.allLeads') }}</span>
           </button>
-          <button 
-            class="quick-filter-btn" 
+          <button
+            class="quick-filter-btn"
             :class="{ active: filters.high_intent_only }"
             @click="quickFilter('high_intent')"
           >
-            <span class="filter-icon">🔥</span>
+            <el-icon class="filter-icon"><Opportunity /></el-icon>
             <span>{{ t('leads.highIntent') }}</span>
           </button>
-          <button 
-            class="quick-filter-btn" 
+          <button
+            class="quick-filter-btn"
             :class="{ active: filters.manual_callback_only }"
             @click="quickFilter('manual_callback')"
           >
-            <span class="filter-icon">⚠️</span>
+            <el-icon class="filter-icon"><Warning /></el-icon>
             <span>{{ t('leads.manualCallback') }}</span>
-          </button>
-          <button 
-            class="quick-filter-btn" 
-            :class="{ active: filters.wecom_status === 'added' }"
-            @click="quickFilter('wecom_added')"
-          >
-            <span class="filter-icon">✅</span>
-            <span>{{ t('leads.wecomAddedFilter') }}</span>
-          </button>
-          <button 
-            class="quick-filter-btn" 
-            :class="{ active: filters.wecom_status === 'not_added' }"
-            @click="quickFilter('wecom_not_added')"
-          >
-            <span class="filter-icon">📱</span>
-            <span>{{ t('leads.wecomNotAddedFilter') }}</span>
           </button>
         </div>
 
-        <!-- 搜索区域 -->
-        <div class="search-area">
-          <el-input
-            v-model="localFilters.search"
-            :placeholder="'🔍 ' + t('leads.searchPlaceholder')"
-            class="search-input"
-            clearable
-            @keyup.enter="applyFilters"
-          />
-          <button class="filter-btn primary" @click="applyFilters">
-            <span class="btn-icon">🔍</span>
-            <span>{{ t('common.search') }}</span>
-          </button>
+        <div class="toolbar-actions">
           <button class="filter-btn secondary" @click="resetFilters">
-            <span class="btn-icon">🔄</span>
+            <el-icon class="btn-icon"><RefreshRight /></el-icon>
             <span>{{ t('common.reset') }}</span>
           </button>
-          <button class="filter-btn primary" @click="handleExport" :disabled="exporting">
-            <span class="btn-icon">⬇️</span>
+          <button class="filter-btn dark" @click="handleExport" :disabled="exporting">
+            <el-icon class="btn-icon"><Download /></el-icon>
             <span>{{ exporting ? t('leads.exportingExcel') : t('leads.exportExcel') }}</span>
           </button>
         </div>
       </div>
+
+      <div class="advanced-filter-bar">
+        <div class="advanced-filter-grid">
+          <div class="search-input-wrap search-input-wrap--wide">
+            <el-icon class="search-input-icon"><Search /></el-icon>
+            <el-input
+              v-model="localFilters.search"
+              :placeholder="t('leads.searchPlaceholder')"
+              class="search-input"
+              clearable
+              @keyup.enter="applyFilters"
+            />
+          </div>
+
+          <el-select
+            v-model="localFilters.intended_product"
+            class="filter-select"
+            clearable
+            filterable
+            allow-create
+            default-first-option
+            :placeholder="t('leads.productFilterPlaceholder')"
+          >
+            <el-option
+              v-for="option in productOptions"
+              :key="option"
+              :label="option"
+              :value="option"
+            />
+          </el-select>
+
+          <el-select
+            v-model="localFilters.interest_level"
+            class="filter-select"
+            clearable
+            :placeholder="t('leads.interestFilterPlaceholder')"
+          >
+            <el-option
+              v-for="option in interestLevelOptions"
+              :key="option"
+              :label="option"
+              :value="option"
+            />
+          </el-select>
+
+          <el-select
+            v-model="localFilters.follow_up_owner_name"
+            class="filter-select"
+            clearable
+            filterable
+            allow-create
+            default-first-option
+            :placeholder="t('leads.ownerFilterPlaceholder')"
+          >
+            <el-option
+              v-for="option in ownerOptions"
+              :key="option"
+              :label="option"
+              :value="option"
+            />
+          </el-select>
+        </div>
+
+        <div class="advanced-filter-actions">
+          <button class="filter-btn primary" @click="applyFilters">
+            <el-icon class="btn-icon"><Search /></el-icon>
+            <span>{{ t('common.search') }}</span>
+          </button>
+          <button class="filter-btn danger" :disabled="!canBulkDelete" @click="handleBulkDelete">
+            <el-icon class="btn-icon"><Delete /></el-icon>
+            <span>{{ t('leads.bulkDelete') }}</span>
+          </button>
+        </div>
+      </div>
     </div>
 
-    <!-- 表格区域 -->
-    <div class="table-section glass" v-loading="loading">
+    <div class="table-section" v-loading="loading">
       <div class="table-wrapper">
         <table class="leads-table">
           <thead>
             <tr>
+              <th class="selection-col">
+                <input
+                  class="lead-checkbox"
+                  type="checkbox"
+                  :checked="isCurrentPageFullySelected()"
+                  @change="toggleCurrentPageSelection"
+                />
+              </th>
               <th>{{ t('leads.parentName') }}</th>
               <th>{{ t('leads.contact') }}</th>
-              <th>{{ t('leads.intendedCampus') }}</th>
-              <th>{{ t('leads.wecomStatus') }}</th>
-              <th>{{ t('leads.wecomNickname') }}</th>
+              <th>{{ t('leads.intendedProduct') }}</th>
+              <th>{{ t('leads.interestLevel') }}</th>
               <th>{{ t('leads.followUpOwner') }}</th>
-              <th class="summary-col">{{ t('leads.aiSummary') }}</th>
-              <th>{{ t('leads.actions') }}</th>
+              <th class="action-col">{{ t('leads.actions') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="lead in leads" :key="lead.id" class="table-row">
+              <td class="selection-col">
+                <input
+                  class="lead-checkbox"
+                  type="checkbox"
+                  :checked="isLeadSelected(lead.id)"
+                  @change="toggleLeadSelection(lead.id)"
+                />
+              </td>
               <td>
                 <div class="name-cell">
-                  <span class="avatar">👤</span>
-                  <span>{{ lead.display_name || lead.parent_name || t('leads.notIdentified') }}</span>
+                  <button class="name-link" @click="viewDetails(lead.id)">
+                    {{ lead.display_name || lead.parent_name || t('leads.notIdentified') }}
+                  </button>
                 </div>
               </td>
               <td>{{ lead.display_phone || lead.parent_phone || t('leads.notProvided') }}</td>
               <td>
-                <span class="campus-tag">{{ getCampusText(lead.campus) }}</span>
+                <span class="product-text">{{ getIntendedProductText(lead) }}</span>
               </td>
               <td>
-                <span
-                  class="status-badge"
-                  :class="getWecomStatusClass(lead.wecom_status)"
-                >
-                  {{ getWecomStatusText(lead.wecom_status) }}
+                <span class="status-badge" :class="getInterestLevelClass(lead.interest_level)">
+                  {{ lead.interest_level || t('leads.notProvided') }}
                 </span>
-              </td>
-              <td>
-                {{ lead.wecom_contact_name || t('leads.wecomNicknameNone') }}
               </td>
               <td>
                 {{ getOwnerName(lead) }}
               </td>
-              <td class="summary-col">
-                <div class="summary-text">{{ getSummaryText(lead) }}</div>
-              </td>
-              <td>
+              <td class="action-col">
                 <div class="action-buttons">
+                  <button class="action-btn lock-btn" @click="handleLock(lead)">
+                    <span>{{ t('leads.lock') }}</span>
+                  </button>
                   <button class="action-btn view-btn" @click="viewDetails(lead.id)">
-                    {{ t('common.view') }}
+                    <span>{{ t('common.view') }}</span>
                   </button>
                   <button class="action-btn assign-btn" @click="openAssignDialog(lead)">
-                    {{ t('leads.assign') }}
+                    <span class="icon-hover-shell" aria-hidden="true">
+                      <span class="custom-icon custom-icon-assign">
+                        <svg viewBox="0 0 24 24" fill="none">
+                          <circle cx="9" cy="8" r="4" stroke="currentColor" stroke-width="2" />
+                          <path d="M2.5 20C3.4 16.9 5.9 15 9 15C12.1 15 14.6 16.9 15.5 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                          <path d="M18 5V13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                          <path d="M14 9H22" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                      </span>
+                    </span>
+                    <span class="sr-only">{{ t('leads.assign') }}</span>
                   </button>
                   <button class="action-btn delete-btn" @click="handleDelete(lead.id)">
-                    {{ t('common.delete') }}
+                    <span class="icon-hover-shell" aria-hidden="true">
+                      <span class="custom-icon custom-icon-delete">
+                        <svg viewBox="0 0 24 24" fill="none">
+                          <path d="M4 7H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                          <path d="M9 4H15" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                          <path d="M7 7V19C7 20.1 7.9 21 9 21H15C16.1 21 17 20.1 17 19V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                          <path d="M10 11V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                          <path d="M14 11V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                      </span>
+                    </span>
+                    <span class="sr-only">{{ t('common.delete') }}</span>
                   </button>
                 </div>
               </td>
@@ -144,7 +218,9 @@
 
         <!-- 空状态 -->
         <div v-if="!loading && leads.length === 0" class="empty-state">
-          <div class="empty-icon">📭</div>
+          <div class="empty-icon">
+            <el-icon><DocumentCopy /></el-icon>
+          </div>
           <div class="empty-text">{{ t('leads.noData') }}</div>
         </div>
       </div>
@@ -152,7 +228,6 @@
       <!-- 分页 -->
       <div v-if="total > 0" class="pagination-wrapper">
         <el-pagination
-          background
           layout="prev, pager, next"
           :total="total"
           :page-size="filters.page_size"
@@ -162,9 +237,8 @@
       </div>
     </div>
 
-    <!-- 错误提示 -->
-    <div v-if="error" class="error-alert glass">
-      <div class="error-icon">⚠️</div>
+    <div v-if="error" class="error-alert">
+      <el-icon class="error-icon"><Warning /></el-icon>
       <div class="error-text">{{ error }}</div>
     </div>
 
@@ -198,13 +272,23 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, watch, ref } from 'vue';
+import { computed, onMounted, reactive, watch, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useLeadStore } from '@/stores/lead';
 import { useI18n } from 'vue-i18n';
-import type { LeadListItem, WecomStatus } from '@/types';
-import { ElMessage } from 'element-plus';
+import type { LeadListItem } from '@/types';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import {
+  Delete,
+  DocumentCopy,
+  Download,
+  Opportunity,
+  RefreshRight,
+  Search,
+  Tickets,
+  Warning,
+} from '@element-plus/icons-vue';
 import { exportLeads as exportLeadsApi } from '@/api/lead';
 import { useAuthStore } from '@/stores/auth';
 import { getPortalLeadDetailPath } from '@/router/portalRoutes';
@@ -219,12 +303,16 @@ const { leads, total, loading, error, filters } = storeToRefs(leadStore);
 // Local state for filters to avoid direct mutation before applying
 const localFilters = reactive({
   search: filters.value.search || '',
+  intended_product: filters.value.intended_product || '',
+  interest_level: filters.value.interest_level || '',
+  follow_up_owner_name: filters.value.follow_up_owner_name || '',
 });
 
 const assignDialogVisible = ref(false);
 const selectedTeacherId = ref<string | null>(null);
 const assignTargetLead = ref<LeadListItem | null>(null);
 const exporting = ref(false);
+const selectedLeadIds = ref<string[]>([]);
 // TODO: replace mock data with backend teacher list once assignment API is ready.
 const mockTeachers = [
   { id: 'teacher_a', name: 'A老师（模拟数据，后端上线需删除）' },
@@ -236,97 +324,125 @@ const isAllLeadsFilterActive = () => (
   !filters.value.high_intent_only
   && !filters.value.manual_callback_only
   && !filters.value.appointment_status
-  && !filters.value.wecom_status
+  && !filters.value.search
+  && !filters.value.intended_product
+  && !filters.value.interest_level
+  && !filters.value.follow_up_owner_name
 );
+
+const productOptions = computed(() =>
+  Array.from(
+    new Set(
+      leads.value
+        .map((lead) => (lead.intended_product || '').trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+);
+
+const ownerOptions = computed(() =>
+  Array.from(
+    new Set(
+      leads.value
+        .map((lead) => (lead.follow_up_owner?.name || '').trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+);
+
+const interestLevelOptions = computed(() => ['一般', '高', '极高']);
+const canBulkDelete = computed(() => selectedLeadIds.value.length > 0);
 
 const applyFilters = () => {
   void leadStore.setFilters({
     search: localFilters.search,
+    intended_product: localFilters.intended_product,
+    interest_level: localFilters.interest_level,
+    follow_up_owner_name: localFilters.follow_up_owner_name,
     high_intent_only: filters.value.high_intent_only,
     manual_callback_only: filters.value.manual_callback_only,
     appointment_status: filters.value.appointment_status,
-    wecom_status: filters.value.wecom_status,
   });
 };
 
 const resetFilters = () => {
   localFilters.search = '';
+  localFilters.intended_product = '';
+  localFilters.interest_level = '';
+  localFilters.follow_up_owner_name = '';
   
   void leadStore.setFilters({
     search: '',
+    intended_product: '',
+    interest_level: '',
+    follow_up_owner_name: '',
     high_intent_only: undefined,
     manual_callback_only: undefined,
     appointment_status: undefined,
-    wecom_status: undefined,
   });
 };
 
 const quickFilter = (type: string) => {
   // 重置搜索
   localFilters.search = '';
+  localFilters.intended_product = '';
+  localFilters.interest_level = '';
+  localFilters.follow_up_owner_name = '';
   
   switch (type) {
     case 'all':
       void leadStore.setFilters({
         search: '',
+        intended_product: '',
+        interest_level: '',
+        follow_up_owner_name: '',
         high_intent_only: undefined,
         manual_callback_only: undefined,
         appointment_status: undefined,
-        wecom_status: undefined,
       });
       break;
     case 'high_intent':
       void leadStore.setFilters({
         search: '',
+        intended_product: '',
+        interest_level: '',
+        follow_up_owner_name: '',
         high_intent_only: true,
         manual_callback_only: undefined,
         appointment_status: undefined,
-        wecom_status: undefined,
       });
       break;
     case 'manual_callback':
       void leadStore.setFilters({
         search: '',
+        intended_product: '',
+        interest_level: '',
+        follow_up_owner_name: '',
         high_intent_only: undefined,
         manual_callback_only: true,
         appointment_status: undefined,
-        wecom_status: undefined,
       });
       break;
     case 'pending_appointment':
       void leadStore.setFilters({
         search: '',
+        intended_product: '',
+        interest_level: '',
+        follow_up_owner_name: '',
         high_intent_only: undefined,
         manual_callback_only: undefined,
         appointment_status: 'pending',
-        wecom_status: undefined,
       });
       break;
     case 'confirmed_appointment':
       void leadStore.setFilters({
         search: '',
+        intended_product: '',
+        interest_level: '',
+        follow_up_owner_name: '',
         high_intent_only: undefined,
         manual_callback_only: undefined,
         appointment_status: 'confirmed',
-        wecom_status: undefined,
-      });
-      break;
-    case 'wecom_added':
-      void leadStore.setFilters({
-        search: '',
-        high_intent_only: undefined,
-        manual_callback_only: undefined,
-        appointment_status: undefined,
-        wecom_status: 'added',
-      });
-      break;
-    case 'wecom_not_added':
-      void leadStore.setFilters({
-        search: '',
-        high_intent_only: undefined,
-        manual_callback_only: undefined,
-        appointment_status: undefined,
-        wecom_status: 'not_added',
       });
       break;
   }
@@ -342,6 +458,57 @@ const viewDetails = (id: string) => {
 
 const handleDelete = async (id: string) => {
   await leadStore.removeLead(id);
+  selectedLeadIds.value = selectedLeadIds.value.filter((item) => item !== id);
+};
+
+const handleBulkDelete = async () => {
+  if (!selectedLeadIds.value.length) return;
+
+  try {
+    await ElMessageBox.confirm(
+      t('leads.bulkDeleteConfirm', { count: selectedLeadIds.value.length }),
+      t('leads.bulkDeleteTitle'),
+      {
+        type: 'warning',
+        confirmButtonText: t('common.delete'),
+        cancelButtonText: t('common.cancel'),
+      }
+    );
+
+    await leadStore.removeLeads(selectedLeadIds.value);
+    selectedLeadIds.value = [];
+  } catch {
+    // 用户取消时不提示错误
+  }
+};
+
+const isLeadSelected = (id: string) => selectedLeadIds.value.includes(id);
+
+const isCurrentPageFullySelected = () => (
+  leads.value.length > 0
+  && leads.value.every((lead) => selectedLeadIds.value.includes(lead.id))
+);
+
+const toggleLeadSelection = (id: string) => {
+  selectedLeadIds.value = selectedLeadIds.value.includes(id)
+    ? selectedLeadIds.value.filter((item) => item !== id)
+    : [...selectedLeadIds.value, id];
+};
+
+const toggleCurrentPageSelection = () => {
+  if (isCurrentPageFullySelected()) {
+    const currentIds = new Set(leads.value.map((lead) => lead.id));
+    selectedLeadIds.value = selectedLeadIds.value.filter((id) => !currentIds.has(id));
+    return;
+  }
+  selectedLeadIds.value = Array.from(new Set([
+    ...selectedLeadIds.value,
+    ...leads.value.map((lead) => lead.id),
+  ]));
+};
+
+const handleLock = (lead: LeadListItem) => {
+  ElMessage.info(`${lead.display_name || lead.parent_name || t('leads.notIdentified')}：${t('leads.lockTodo')}`);
 };
 
 const handleExport = async () => {
@@ -398,41 +565,23 @@ const assignLead = () => {
   closeAssignDialog();
 };
 
-const getWecomStatusClass = (status: string | null | undefined) => {
-  switch (status) {
-    case 'added':
-      return 'status-success';
-    case 'pending':
-      return 'status-warning';
-    default:
+const getIntendedProductText = (lead: LeadListItem) => (
+  lead.intended_product || t('leads.notProvided')
+);
+
+const getInterestLevelClass = (level: string | null | undefined) => {
+  switch (level) {
+    case '极高':
+    case 'Very High':
       return 'status-danger';
-  }
-};
-
-const getWecomStatusText = (status: string | null | undefined) => {
-  switch (status) {
-    case 'added':
-      return t('leads.statusAdded');
-    case 'pending':
-      return t('leads.statusPendingBind');
+    case '高':
+    case 'High':
+      return 'status-warning';
+    case '一般':
+    case 'Normal':
+      return 'status-info';
     default:
-      return t('leads.statusNotAdded');
-  }
-};
-
-const getCampusText = (campus: string | null | undefined) => {
-  switch (campus) {
-    case '浦东':
-    case 'Pudong':
-      return t('leads.campusPudong');
-    case '浦西':
-    case 'Puxi':
-      return t('leads.campusPuxi');
-    case '临港':
-    case 'Lingang':
-      return t('leads.campusLingang');
-    default:
-      return t('leads.campusUnknown');
+      return 'status-muted';
   }
 };
 
@@ -450,20 +599,6 @@ const getOwnerName = (lead: LeadListItem) => {
   return name;
 };
 
-const getSummaryText = (lead: LeadListItem) => {
-  const summary = locale.value === 'en'
-    ? (lead.en_summary || lead.summary)
-    : lead.summary;
-
-  if (!summary || !summary.trim()) {
-    return t('leads.noSummary');
-  }
-  if (summary === '暂无有效信息' || summary === 'No valid summary yet') {
-    return t('leads.noSummary');
-  }
-  return summary;
-};
-
 const parseBooleanQuery = (value: unknown): boolean | undefined => {
   if (value === undefined || value === null) return undefined;
   if (typeof value === 'string') {
@@ -476,7 +611,6 @@ const parseBooleanQuery = (value: unknown): boolean | undefined => {
 
 onMounted(async () => {
   const appointmentStatusQuery = route.query.appointment_status as string | undefined;
-  const wecomStatusQuery = route.query.wecom_status as string | undefined;
   const highIntentQuery = parseBooleanQuery(route.query.high_intent_only);
   const manualCallbackQuery = parseBooleanQuery(route.query.manual_callback_only);
 
@@ -484,9 +618,6 @@ onMounted(async () => {
 
   if (appointmentStatusQuery) {
     initialFilters.appointment_status = appointmentStatusQuery;
-  }
-  if (wecomStatusQuery && ['added', 'not_added', 'pending'].includes(wecomStatusQuery)) {
-    initialFilters.wecom_status = wecomStatusQuery as WecomStatus;
   }
   if (highIntentQuery !== undefined) {
     initialFilters.high_intent_only = highIntentQuery;
@@ -515,21 +646,6 @@ watch(
     } else if (value === undefined) {
       void leadStore.setFilters({
         appointment_status: undefined,
-      });
-    }
-  }
-);
-
-watch(
-  () => route.query.wecom_status,
-  (value) => {
-    if (typeof value === 'string' && ['added', 'pending', 'not_added'].includes(value)) {
-      void leadStore.setFilters({
-        wecom_status: value as WecomStatus,
-      });
-    } else if (value === undefined) {
-      void leadStore.setFilters({
-        wecom_status: undefined,
       });
     }
   }
@@ -577,68 +693,61 @@ watch(
 <style scoped>
 .leads-view {
   padding: 0;
+  color: #273142;
 }
 
-/* 毛玻璃效果 */
-.glass {
-  background: rgba(255, 255, 255, 0.25);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
-}
-
-/* 页面标题 */
 .page-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5ebf2;
 }
 
 .page-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: #2c3e50;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: #1f2937;
   margin: 0;
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
 .total-count {
-  font-size: 15px;
-  color: rgba(44, 62, 80, 0.7);
-  font-weight: 600;
-  padding: 8px 18px;
-  background: rgba(52, 152, 219, 0.1);
-  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #8a97a8;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
 }
 
-/* 筛选区域 */
+.total-count--inline {
+  margin-top: 1px;
+}
+
 .filter-section {
-  padding: 20px;
-  border-radius: 15px;
-  margin-bottom: 20px;
-  transition: all 0.3s ease;
-}
-
-.filter-section:hover {
-  background: rgba(255, 255, 255, 0.35);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  margin-bottom: 24px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  border: 1px solid #dde6f0;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(29, 41, 57, 0.06);
 }
 
 .filter-row {
   display: flex;
-  gap: 15px;
+  gap: 14px;
   align-items: center;
   justify-content: space-between;
 }
 
-/* 快捷筛选按钮组 */
 .quick-filters {
   display: flex;
   gap: 10px;
@@ -649,279 +758,476 @@ watch(
 .quick-filter-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 18px;
-  border-radius: 12px;
-  border: 2px solid transparent;
-  background: rgba(255, 255, 255, 0.4);
-  color: rgba(44, 62, 80, 0.7);
+  gap: 9px;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 15px;
+  border: 1px solid #d9e3ee;
+  background: #ffffff;
+  color: #6f8098;
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   white-space: nowrap;
+  box-shadow: 0 3px 12px rgba(22, 34, 51, 0.04);
 }
 
 .quick-filter-btn:hover {
-  background: rgba(255, 255, 255, 0.6);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  border-color: #c3d0e0;
+  background: #f9fbfd;
+  color: #42526b;
 }
 
 .quick-filter-btn.active {
-  background: linear-gradient(135deg, #3498db, #2980b9);
-  color: white;
-  border-color: rgba(52, 152, 219, 0.5);
-  box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+  background: #202a39;
+  color: #ffffff;
+  border-color: #202a39;
+  box-shadow: 0 10px 20px rgba(32, 42, 57, 0.14);
 }
 
 .filter-icon {
   font-size: 16px;
 }
 
-/* 搜索区域 */
-.search-area {
+.toolbar-actions {
   display: flex;
   gap: 10px;
   align-items: center;
   flex-shrink: 0;
 }
 
+.advanced-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid #e2e9f1;
+  background: #f9fbfd;
+}
+
+.advanced-filter-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) repeat(3, minmax(160px, 1fr));
+  gap: 12px;
+  flex: 1;
+}
+
+.advanced-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding-left: 40px;
+  border-radius: 14px;
+  border: 1px solid #d9e3ee;
+  background: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.search-input-wrap--wide {
+  min-width: 0;
+}
+
+.search-input-wrap:focus-within {
+  border-color: #243041;
+  box-shadow: 0 0 0 3px rgba(36, 48, 65, 0.08);
+}
+
+.search-input-icon {
+  position: absolute;
+  left: 14px;
+  color: #8292a8;
+  font-size: 17px;
+  pointer-events: none;
+}
+
 .search-input {
-  width: 240px;
+  width: 100%;
+}
+
+.filter-select {
+  width: 100%;
+}
+
+:deep(.search-input .el-input__wrapper) {
+  padding: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+:deep(.search-input .el-input__inner) {
+  height: 42px;
+  color: #273142;
+  font-size: 14px;
+}
+
+:deep(.search-input .el-input__inner::placeholder) {
+  color: #a3afbf;
+}
+
+:deep(.filter-select .el-select__wrapper) {
+  min-height: 44px;
+  border-radius: 14px;
+  box-shadow: none;
+  background: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+:deep(.filter-select .el-select__wrapper.is-focused) {
+  border-color: #243041;
+  box-shadow: 0 0 0 3px rgba(36, 48, 65, 0.08);
+}
+
+:deep(.filter-select .el-select__placeholder),
+:deep(.filter-select .el-select__selected-item) {
+  font-size: 14px;
 }
 
 .filter-btn {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 22px;
-  border-radius: 10px;
-  border: none;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid transparent;
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
   white-space: nowrap;
 }
 
 .filter-btn.primary {
-  background: linear-gradient(135deg, #3498db, #2980b9);
-  color: white;
+  background: #3697dd;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(54, 151, 221, 0.18);
 }
 
 .filter-btn.primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+  background: #2d8acf;
 }
 
 .filter-btn.secondary {
-  background: rgba(149, 165, 166, 0.15);
-  color: #7f8c8d;
+  background: #f3f6f9;
+  border-color: #d7e0ea;
+  color: #6d7b8d;
 }
 
 .filter-btn.secondary:hover {
-  background: rgba(149, 165, 166, 0.25);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(149, 165, 166, 0.2);
+  background: #eaf0f5;
+}
+
+.filter-btn.dark {
+  background: #202a39;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(32, 42, 57, 0.15);
+}
+
+.filter-btn.dark:hover {
+  background: #17202d;
+}
+
+.filter-btn.danger {
+  background: #fff1f0;
+  border-color: #ffd7d2;
+  color: #d65a51;
+}
+
+.filter-btn.danger:hover {
+  background: #ffe7e4;
+}
+
+.filter-btn:disabled {
+  opacity: 0.68;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .btn-icon {
-  font-size: 16px;
+  font-size: 15px;
 }
 
-/* 表格区域 */
 .table-section {
-  padding: 25px;
-  border-radius: 20px;
-  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border-radius: 18px;
+  border: 1px solid #dde6f0;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(29, 41, 57, 0.045);
+  min-height: calc(100vh - 318px);
+  overflow: hidden;
 }
 
 .table-wrapper {
+  flex: 1;
   overflow-x: auto;
+  border-radius: 18px 18px 0 0;
 }
 
 .leads-table {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0 10px;
+  min-width: 980px;
+  border-collapse: collapse;
+  background: #ffffff;
 }
 
 .leads-table thead th {
-  padding: 15px 20px;
+  padding: 12px 16px;
   text-align: left;
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(44, 62, 80, 0.7);
-  border: none;
-  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  color: #73839a;
+  border-bottom: 1px solid #e4ebf3;
+  background: #ffffff;
+  white-space: nowrap;
 }
 
 .leads-table tbody tr {
-  background: rgba(255, 255, 255, 0.4);
-  transition: all 0.3s ease;
+  transition: background-color 0.2s ease;
 }
 
 .leads-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.6);
-  transform: translateX(5px);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  background: #fafcfe;
 }
 
 .leads-table tbody td {
-  padding: 20px;
-  border: none;
-  color: #2c3e50;
-  font-size: 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f4f8;
+  color: #425168;
+  font-size: 13px;
+  vertical-align: middle;
 }
 
-.leads-table tbody tr td:first-child {
-  border-radius: 12px 0 0 12px;
+.selection-col {
+  width: 46px;
+  text-align: center !important;
 }
 
-.leads-table tbody tr td:last-child {
-  border-radius: 0 12px 12px 0;
+.action-col {
+  width: 320px;
+  min-width: 320px;
 }
 
-/* 名称单元格 */
+.lead-checkbox {
+  width: 15px;
+  height: 15px;
+  accent-color: #202a39;
+  cursor: pointer;
+}
+
 .name-cell {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-weight: 500;
-}
-
-.avatar {
-  font-size: 24px;
-  line-height: 1;
-}
-
-/* 校区标签 */
-.campus-tag {
-  padding: 6px 14px;
-  border-radius: 8px;
-  background: rgba(52, 152, 219, 0.15);
-  color: #2980b9;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-/* 状态标签 */
-.status-badge {
-  padding: 6px 14px;
-  border-radius: 8px;
-  font-size: 13px;
+  gap: 0;
   font-weight: 600;
-  display: inline-block;
+  color: #1f2937;
+}
+
+.name-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #1f2937;
+  font: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.name-link:hover {
+  color: #2d8acf;
+}
+
+.product-text {
+  font-weight: 600;
+  color: #273142;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .status-warning {
-  background: rgba(241, 196, 15, 0.2);
-  color: #f39c12;
+  background: #fff3dd;
+  color: #b7791f;
 }
 
 .status-success {
-  background: rgba(46, 204, 113, 0.2);
-  color: #27ae60;
+  background: #e5f7ec;
+  color: #239b64;
 }
 
 .status-info {
-  background: rgba(52, 152, 219, 0.2);
-  color: #2980b9;
+  background: #e9f3ff;
+  color: #3576b5;
 }
 
 .status-danger {
-  background: rgba(231, 76, 60, 0.2);
-  color: #c0392b;
+  background: #ffe9e7;
+  color: #d7534b;
 }
 
-/* 摘要列 */
-.summary-col {
-  max-width: 300px;
+.status-muted {
+  background: #f0f3f7;
+  color: #6f8098;
 }
 
-.summary-text {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.5;
-  color: rgba(44, 62, 80, 0.8);
-}
-
-/* 操作按钮 */
 .action-buttons {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
 }
 
 .action-btn {
-  padding: 8px 18px;
-  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0;
   border: none;
+  background: transparent;
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
   white-space: nowrap;
 }
 
 .view-btn {
-  background: rgba(52, 152, 219, 0.15);
-  color: #2980b9;
+  color: #347fc5;
 }
 
 .view-btn:hover {
-  background: rgba(52, 152, 219, 0.25);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+  color: #2468a8;
+}
+
+.lock-btn {
+  gap: 6px;
+  color: #6f7e92;
+}
+
+.lock-btn:hover {
+  color: #435163;
 }
 
 .assign-btn {
-  background: rgba(52, 73, 94, 0.12);
-  color: #34495e;
+  color: #6a7c96;
 }
 
 .assign-btn:hover {
-  background: rgba(52, 73, 94, 0.2);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(52, 73, 94, 0.25);
+  color: #42546d;
 }
 
 .delete-btn {
-  background: rgba(231, 76, 60, 0.15);
-  color: #c0392b;
+  color: #ff6a5f;
 }
 
 .delete-btn:hover {
-  background: rgba(231, 76, 60, 0.25);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+  color: #f25549;
 }
 
-/* 空状态 */
+.icon-hover-shell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.assign-btn:hover .icon-hover-shell,
+.delete-btn:hover .icon-hover-shell {
+  background: #f4f7fb;
+  box-shadow: 0 10px 20px rgba(148, 163, 184, 0.18);
+  transform: translateY(-1px);
+}
+
+.custom-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.custom-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.custom-icon-assign {
+  width: 20px;
+  height: 20px;
+}
+
+.custom-icon-delete {
+  width: 20px;
+  height: 20px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .empty-state {
   text-align: center;
-  padding: 60px 20px;
+  padding: 84px 20px 90px;
 }
 
 .empty-icon {
-  font-size: 64px;
-  margin-bottom: 20px;
-  opacity: 0.6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  margin-bottom: 18px;
+  border-radius: 24px;
+  background: #f4f7fb;
+  color: #8ea0b6;
+  font-size: 38px;
 }
 
 .empty-text {
   font-size: 16px;
-  color: rgba(44, 62, 80, 0.6);
-  font-weight: 500;
+  color: #8a99ad;
+  font-weight: 600;
 }
 
 .assign-hint {
   margin-bottom: 16px;
-  color: rgba(44, 62, 80, 0.7);
+  color: #6e7d90;
   line-height: 1.5;
 }
 
@@ -932,30 +1238,62 @@ watch(
   margin-bottom: 12px;
 }
 
-/* 分页 */
 .pagination-wrapper {
-  margin-top: 25px;
+  margin-top: auto;
+  padding: 12px 18px 14px;
   display: flex;
   justify-content: flex-end;
+  border-top: 1px solid #f1f5f9;
+  background: linear-gradient(180deg, rgba(255,255,255,0.7), #ffffff);
+  border-radius: 0 0 18px 18px;
 }
 
-/* 错误提示 */
+:deep(.pagination-wrapper .btn-prev),
+:deep(.pagination-wrapper .btn-next),
+:deep(.pagination-wrapper .el-pager li) {
+  min-width: 30px;
+  height: 30px;
+  margin: 0 2px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: #7a8798;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+:deep(.pagination-wrapper .btn-prev:hover),
+:deep(.pagination-wrapper .btn-next:hover),
+:deep(.pagination-wrapper .el-pager li:hover) {
+  background: #f3f6fa;
+  color: #1f2937;
+}
+
+:deep(.pagination-wrapper .el-pager li.is-active) {
+  background: transparent;
+  color: #1f2937;
+  box-shadow: inset 0 -2px 0 #1f2937;
+}
+
 .error-alert {
   margin-top: 20px;
-  padding: 20px 25px;
-  border-radius: 15px;
+  padding: 18px 22px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
-  gap: 15px;
-  border-left: 4px solid #e74c3c;
+  gap: 14px;
+  border: 1px solid #f7d3d0;
+  background: #fff6f5;
 }
 
 .error-icon {
-  font-size: 24px;
+  font-size: 22px;
+  color: #d65a51;
 }
 
 .error-text {
-  color: #c0392b;
+  color: #bf4a43;
   font-weight: 500;
   flex: 1;
 }
@@ -965,11 +1303,19 @@ watch(
   .filter-row {
     flex-wrap: wrap;
   }
-  
-  .search-area {
+
+  .toolbar-actions {
     flex-basis: 100%;
-    justify-content: flex-end;
-    margin-top: 10px;
+    justify-content: flex-start;
+  }
+
+  .advanced-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .advanced-filter-actions {
+    justify-content: flex-start;
   }
 }
 
@@ -982,14 +1328,18 @@ watch(
   .quick-filters {
     width: 100%;
   }
-  
-  .search-area {
+
+  .toolbar-actions {
     width: 100%;
-    margin-top: 10px;
   }
-  
-  .search-input {
-    flex: 1;
+
+  .advanced-filter-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .advanced-filter-actions {
+    width: 100%;
+    flex-wrap: wrap;
   }
 }
 
@@ -1005,7 +1355,7 @@ watch(
   }
   
   .filter-section {
-    padding: 15px;
+    padding: 18px;
   }
   
   .quick-filters {
@@ -1016,30 +1366,33 @@ watch(
     flex: 1;
     justify-content: center;
     min-width: calc(50% - 4px);
-    padding: 10px 12px;
+    min-height: 44px;
+    padding: 0 12px;
     font-size: 13px;
   }
   
   .filter-icon {
     font-size: 14px;
   }
-  
-  .search-area {
+
+  .advanced-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .advanced-filter-actions,
+  .toolbar-actions {
     flex-direction: column;
     gap: 8px;
   }
-  
-  .search-input {
-    width: 100%;
-  }
-  
+
   .filter-btn {
     width: 100%;
     justify-content: center;
+    min-height: 42px;
   }
   
   .table-section {
-    padding: 15px;
+    padding-top: 10px;
   }
   
   .leads-table {
@@ -1048,11 +1401,8 @@ watch(
   
   .leads-table thead th,
   .leads-table tbody td {
-    padding: 12px;
+    padding: 14px 12px;
   }
   
-  .summary-col {
-    display: none;
-  }
 }
 </style>

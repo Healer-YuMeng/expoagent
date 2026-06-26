@@ -39,7 +39,7 @@
               </span>
               <img
                 v-else
-                src="/xt.png"
+                src="/xt-sales.svg"
                 alt="Teacher avatar"
                 class="teacher-avatar-image"
               />

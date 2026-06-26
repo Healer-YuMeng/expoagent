@@ -14,6 +14,7 @@ export const useLeadDetailStore = defineStore('leadDetail', () => {
   const currentLanguage = ref<string | undefined>(undefined);
   const aiReplyEnabled = ref(true);
   const pollingConversationId = ref<string | null>(null);
+  let lastAiReplyMutationAt = 0;
   let messagePollingTimer: number | null = null;
 
   function syncMessages(nextMessages: Message[]) {
@@ -50,10 +51,13 @@ export const useLeadDetailStore = defineStore('leadDetail', () => {
   }
 
   async function fetchMessages(conversationId: string, options?: { silent?: boolean }) {
+    const requestStartedAt = Date.now();
     try {
       const response = await getTeacherConversationMessages(conversationId, { page: 1, page_size: 200 });
       syncMessages(response.items);
-      aiReplyEnabled.value = response.ai_reply_enabled !== false;
+      if (requestStartedAt >= lastAiReplyMutationAt) {
+        aiReplyEnabled.value = response.ai_reply_enabled !== false;
+      }
     } catch (e) {
       if (!options?.silent) {
         error.value = '无法加载对话记录';
@@ -121,6 +125,7 @@ export const useLeadDetailStore = defineStore('leadDetail', () => {
   }
 
   async function setAiReplyEnabled(conversationId: string, enabled: boolean) {
+    lastAiReplyMutationAt = Date.now();
     const response = await updateTeacherConversationAiReply(conversationId, enabled);
     aiReplyEnabled.value = response.ai_reply_enabled !== false;
     return response;

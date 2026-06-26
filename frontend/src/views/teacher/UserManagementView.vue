@@ -82,8 +82,10 @@ import { ElMessage } from 'element-plus';
 import { useAuthStore } from '@/stores/auth';
 import { listManagedUsers, createManagedUser, deleteManagedUser, type ManagedUser } from '@/api/teacher';
 import { useI18n } from 'vue-i18n';
+import { useFeatureGateBootstrap } from '@/composables/useFeatureGateBootstrap';
 
 const authStore = useAuthStore();
+useFeatureGateBootstrap();
 const isSuperAdmin = computed(() => authStore.userRole === 'super_admin');
 const { t } = useI18n();
 

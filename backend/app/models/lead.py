@@ -36,6 +36,8 @@ class LeadSchema(BaseModel):
     parent_name: Optional[str] = Field(default=None, description="家长姓名")
     parent_email: Optional[str] = Field(default=None, description="家长邮箱")
     campus: Optional[str] = Field(default=None, description="意向校区")
+    intended_product: Optional[str] = Field(default=None, description="意向产品")
+    interest_level: Optional[str] = Field(default=None, description="意向度")
     school_id: Optional[str] = Field(default=None, description="所属学校")
     has_foreign_passport: bool = Field(default=False, description="家里是否有人是外籍")
     has_appointment: bool = Field(default=False, description="是否已预约")
@@ -179,6 +181,8 @@ class LeadResponse(BaseModel):
     needs_manual_callback: bool
     parent_phone: Optional[str] = None
     parent_name: Optional[str] = None
+    intended_product: Optional[str] = None
+    interest_level: Optional[str] = None
     student_name: Optional[str] = None
     student_age: Optional[int] = None
     grade_applying: Optional[str] = None
@@ -213,6 +217,8 @@ class LeadListItem(BaseModel):
     qv_chat_id: Optional[str] = None
     parent_phone: str
     parent_name: Optional[str] = None
+    intended_product: Optional[str] = None
+    interest_level: Optional[str] = None
     student_name: Optional[str] = None
     grade_applying: Optional[str] = None
     intent_score: int

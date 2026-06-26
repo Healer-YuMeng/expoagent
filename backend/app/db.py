@@ -506,6 +506,8 @@ COLLECTION_SCHEMAS: dict[str, CollectionSchema] = {
             _col("parent_name", "TEXT"),
             _col("parent_email", "TEXT"),
             _col("campus", "TEXT"),
+            _col("intended_product", "TEXT"),
+            _col("interest_level", "TEXT"),
             _col("school_id", "TEXT"),
             _col("has_foreign_passport", "BOOLEAN", default_sql="FALSE"),
             _col("has_appointment", "BOOLEAN", default_sql="FALSE"),

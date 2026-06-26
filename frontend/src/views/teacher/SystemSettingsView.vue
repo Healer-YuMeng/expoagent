@@ -155,8 +155,10 @@ import { useI18n } from 'vue-i18n';
 import QRCode from 'qrcode';
 import { CHANNELS, buildChannelUrl, buildStartChatEntryUrl, type ChannelSlug } from '@/utils/channelSource';
 import { useAuthStore } from '@/stores/auth';
+import { useFeatureGateBootstrap } from '@/composables/useFeatureGateBootstrap';
 
 const { t } = useI18n();
+useFeatureGateBootstrap();
 
 // 多语言配置
 const languages = [

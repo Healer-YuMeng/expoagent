@@ -102,6 +102,8 @@ class LeadDetailResponse(BaseModel):
     display_name: Optional[str]
     display_phone: Optional[str]
     campus: Optional[str]
+    intended_product: Optional[str] = None
+    interest_level: Optional[str] = None
     extracted_info: dict[str, Any]
     student_name: Optional[str]
     student_age: Optional[int]
@@ -139,6 +141,8 @@ class CreateLeadRequest(BaseModel):
     student_age: Optional[int] = Field(None, ge=0, le=18)
     student_grade: Optional[str] = None
     source: str = Field("manual", description="来源")
+    intended_product: Optional[str] = Field(default=None, description="意向产品")
+    interest_level: Optional[str] = Field(default=None, description="意向度")
     is_high_intent: bool = Field(False, description="是否高意向")
     needs_manual_callback: bool = Field(False, description="是否需要人工电话回访")
     tags: Optional[List[str]] = None
@@ -154,6 +158,8 @@ class UpdateLeadRequest(BaseModel):
     student_age: Optional[int] = Field(None, ge=0, le=18)
     student_grade: Optional[str] = None
     parent_email: Optional[str] = None
+    intended_product: Optional[str] = Field(default=None, description="意向产品")
+    interest_level: Optional[str] = Field(default=None, description="意向度")
     tags: Optional[List[str]] = None
     next_follow_up_date: Optional[datetime] = None
     wecom_status: Optional[Literal["not_added", "pending", "added"]] = Field(
@@ -174,6 +180,11 @@ class UpdateNoteRequest(BaseModel):
     """更新跟进记录请求"""
     content: str = Field(..., min_length=1, max_length=2000, description="跟进内容")
     follow_up_method: Optional[str] = Field(default=None, description="跟进方式: phone/wechat/email/visit/other")
+
+
+class BulkDeleteLeadsRequest(BaseModel):
+    """批量删除线索请求"""
+    lead_ids: List[str] = Field(..., min_length=1, description="待删除的线索 ID 列表")
 
 
 class AppointmentActionRequest(BaseModel):
@@ -275,10 +286,11 @@ def _build_export_rows(items: List[dict]) -> list[dict]:
         appointment = item.get("appointment") or {}
         rows.append(
             {
-                "家长姓名": item.get("parent_name") or item.get("display_name") or "",
-                "手机号": item.get("parent_phone") or item.get("display_phone") or "",
+                "称呼": item.get("display_name") or item.get("parent_name") or "",
+                "联系方式": item.get("display_phone") or item.get("parent_phone") or "",
                 "邮箱": item.get("parent_email") or "",
-                "意向校区": item.get("campus") or "",
+                "意向产品": item.get("intended_product") or "",
+                "意向度": item.get("interest_level") or "",
                 "学生姓名": item.get("student_name") or "",
                 "AI摘要": item.get("summary") or "",
                 "高意向": "是" if item.get("is_high_intent") else "否",
@@ -293,6 +305,43 @@ def _build_export_rows(items: List[dict]) -> list[dict]:
             }
         )
     return rows
+
+
+def _first_text_value(*values: Any) -> Optional[str]:
+    for value in values:
+        if isinstance(value, str):
+            text = value.strip()
+            if text:
+                return text
+    return None
+
+
+def _resolve_intended_product(lead_dict: dict[str, Any], extracted_info: dict[str, Any]) -> Optional[str]:
+    return _first_text_value(
+        lead_dict.get("intended_product"),
+        extracted_info.get("intended_product"),
+        extracted_info.get("interest_product"),
+        extracted_info.get("product"),
+        extracted_info.get("course"),
+        extracted_info.get("program"),
+    )
+
+
+def _resolve_interest_level(lead_dict: dict[str, Any]) -> str:
+    explicit = _first_text_value(lead_dict.get("interest_level"))
+    if explicit:
+        return explicit
+    try:
+        score = int(lead_dict.get("intent_score") or 0)
+    except (TypeError, ValueError):
+        score = 0
+    if score >= 85:
+        return "极高"
+    if score >= 70:
+        return "高"
+    if score >= 40:
+        return "一般"
+    return "低"
 
 
 def _prefers_english(language: Optional[str]) -> bool:
@@ -356,14 +405,13 @@ async def get_leads(
     high_intent_only: Optional[bool] = Query(None, description="是否仅查看高意向线索"),
     manual_callback_only: Optional[bool] = Query(None, description="是否仅查看需人工回访线索"),
     search: Optional[str] = Query(None, description="搜索（姓名/手机号）"),
+    intended_product: Optional[str] = Query(None, description="意向产品筛选"),
+    interest_level: Optional[str] = Query(None, description="意向度筛选"),
+    follow_up_owner_name: Optional[str] = Query(None, description="跟进人筛选"),
     appointment_status: Optional[str] = Query(None, description="预约状态筛选：pending/confirmed/rejected"),
-    wecom_status: Optional[Literal["not_added", "pending", "added"]] = Query(
-        None,
-        description="企微添加状态筛选"
-    ),
     language: Optional[str] = Query(None, description="当前界面语言"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
     current_teacher: UserSchema = Depends(get_current_teacher),
     db: PostgresCompatDatabase = Depends(get_database)
 ):
@@ -401,11 +449,15 @@ async def get_leads(
             {"parent_phone": {"$regex": search}},
             {"student_name": {"$regex": search, "$options": "i"}}
         ]
+    if intended_product:
+        query["intended_product"] = intended_product
+    if interest_level:
+        query["interest_level"] = interest_level
+    if follow_up_owner_name:
+        query["follow_up_owner.name"] = follow_up_owner_name
 
     if appointment_status:
         query["appointment.status"] = appointment_status
-    if wecom_status:
-        query["wecom_status"] = wecom_status
     
     total = await db.leads.count_documents(query)
     
@@ -462,6 +514,8 @@ async def get_leads(
             display_phone = appointment_phone
 
         raw_notes = lead_dict.get("notes") or []
+        intended_product = _resolve_intended_product(lead_dict, extracted_info)
+        interest_level = _resolve_interest_level(lead_dict)
 
         leads.append({
             "id": lead_id,
@@ -471,6 +525,8 @@ async def get_leads(
             "display_name": display_name,
             "display_phone": display_phone,
             "campus": campus,
+            "intended_product": intended_product,
+            "interest_level": interest_level,
             "student_name": lead_dict.get("student_name"),
             "source": lead_dict.get("source", "unknown"),
             "is_high_intent": lead_dict.get("is_high_intent", False),
@@ -508,11 +564,10 @@ async def export_leads(
     high_intent_only: Optional[bool] = Query(None, description="是否仅查看高意向线索"),
     manual_callback_only: Optional[bool] = Query(None, description="是否仅查看需人工回访线索"),
     search: Optional[str] = Query(None, description="搜索（姓名/手机号）"),
+    intended_product: Optional[str] = Query(None, description="意向产品筛选"),
+    interest_level: Optional[str] = Query(None, description="意向度筛选"),
+    follow_up_owner_name: Optional[str] = Query(None, description="跟进人筛选"),
     appointment_status: Optional[str] = Query(None, description="预约状态筛选：pending/confirmed/rejected"),
-    wecom_status: Optional[Literal["not_added", "pending", "added"]] = Query(
-        None,
-        description="企微添加状态筛选"
-    ),
     current_teacher: UserSchema = Depends(get_current_teacher),
     db: PostgresCompatDatabase = Depends(get_database)
 ):
@@ -530,11 +585,15 @@ async def export_leads(
             {"parent_phone": {"$regex": search}},
             {"student_name": {"$regex": search, "$options": "i"}}
         ]
+    if intended_product:
+        query["intended_product"] = intended_product
+    if interest_level:
+        query["interest_level"] = interest_level
+    if follow_up_owner_name:
+        query["follow_up_owner.name"] = follow_up_owner_name
 
     if appointment_status:
         query["appointment.status"] = appointment_status
-    if wecom_status:
-        query["wecom_status"] = wecom_status
 
     cursor = (
         db.leads.find(query)
@@ -571,6 +630,8 @@ async def export_leads(
             display_phone = appointment_phone
 
         raw_notes = lead_dict.get("notes") or []
+        intended_product = _resolve_intended_product(lead_dict, extracted_info)
+        interest_level = _resolve_interest_level(lead_dict)
 
         items.append(
             {
@@ -580,6 +641,8 @@ async def export_leads(
                 "display_name": display_name,
                 "display_phone": display_phone,
                 "campus": campus,
+                "intended_product": intended_product,
+                "interest_level": interest_level,
                 "student_name": lead_dict.get("student_name"),
                 "source": lead_dict.get("source", "unknown"),
                 "is_high_intent": lead_dict.get("is_high_intent", False),
@@ -623,7 +686,7 @@ async def export_leads(
 @router.get("/my", response_model=LeadListResponse, summary="获取我的线索")
 async def get_my_leads(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
     current_teacher: UserSchema = Depends(get_current_teacher),
 ):
     """当前版本已取消线索分配功能，返回空列表以保持兼容。"""
@@ -720,6 +783,8 @@ async def get_lead_detail(
         or parent_name_value
     )
     display_phone = appointment_phone or extracted_info.get("phone") or parent_phone_value
+    intended_product = _resolve_intended_product(lead_dict, extracted_info)
+    interest_level = _resolve_interest_level(lead_dict)
     parent_id = lead_dict.get("parent_id")
     if isinstance(parent_id, ObjectId):
         parent_id = str(parent_id)
@@ -767,6 +832,8 @@ async def get_lead_detail(
         display_name=display_name,
         display_phone=display_phone,
         campus=campus,
+        intended_product=intended_product,
+        interest_level=interest_level,
         extracted_info=extracted_info,
         student_name=lead_dict.get("student_name"),
         student_age=lead_dict.get("student_age"),
@@ -829,6 +896,8 @@ async def create_lead(
         parent_name=request.parent_name,
         parent_phone=request.parent_phone,
         parent_email=request.parent_email,
+        intended_product=request.intended_product,
+        interest_level=request.interest_level,
         student_name=request.student_name,
         student_age=request.student_age,
         student_grade=request.student_grade,
@@ -889,6 +958,12 @@ async def update_lead(
     
     if request.parent_email is not None:
         update_data["parent_email"] = request.parent_email
+
+    if request.intended_product is not None:
+        update_data["intended_product"] = request.intended_product
+
+    if request.interest_level is not None:
+        update_data["interest_level"] = request.interest_level
     
     if request.tags is not None:
         update_data["tags"] = request.tags
@@ -1142,6 +1217,41 @@ async def delete_lead(
     logger.info(f"教师 {current_teacher.phone} 删除线索 {lead_id}")
     
     return {"message": "线索已删除"}
+
+
+@router.delete("", summary="批量删除线索")
+async def bulk_delete_leads(
+    request: BulkDeleteLeadsRequest,
+    current_teacher: UserSchema = Depends(get_current_teacher),
+    db: PostgresCompatDatabase = Depends(get_database)
+):
+    """
+    批量删除线索。
+    """
+    ids = [lead_id for lead_id in request.lead_ids if lead_id]
+    if not ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="请先选择要删除的线索"
+        )
+
+    filters = [{"_id": ObjectId(lead_id)} if ObjectId.is_valid(lead_id) else {"_id": lead_id} for lead_id in ids]
+    result = await db.leads.delete_many({"$or": filters})
+
+    if result.deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="未找到可删除的线索"
+        )
+
+    logger.info("教师 %s 批量删除线索 %s 条", current_teacher.phone, result.deleted_count)
+
+    return {
+        "message": f"已批量删除 {result.deleted_count} 条线索",
+        "deleted_count": result.deleted_count,
+    }
+
+
 class FollowUpOwnerPayload(BaseModel):
     """跟进老师信息"""
     name: str = Field(..., description="老师姓名", min_length=1)
