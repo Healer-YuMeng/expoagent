@@ -11,6 +11,12 @@ type PortalTarget =
   | 'systemSettings'
   | 'userManagement';
 
+export type ControlledPortalFeatureTarget =
+  | 'manualCallbacks'
+  | 'systemPrompt'
+  | 'userManagement'
+  | 'systemSettings';
+
 interface PortalPathOptions {
   id?: string;
 }
@@ -20,7 +26,7 @@ const SCHOOL_ADMIN_BASE = '/expo-system';
 const TEACHER_BASE = '/expo-system/user';
 const PARENT_CONVERSATION_BASE = '/expoagent/conversations';
 const EXACT_MATCH_MENU_PATHS = new Set([SUPER_ADMIN_BASE, SCHOOL_ADMIN_BASE, TEACHER_BASE]);
-const SCHOOL_ADMIN_LOCKED_TARGETS: PortalTarget[] = [
+const CONTROLLED_PORTAL_FEATURE_TARGETS: ControlledPortalFeatureTarget[] = [
   'manualCallbacks',
   'systemPrompt',
   'userManagement',
@@ -96,17 +102,37 @@ export function isPortalMenuPathActive(currentPath: string, itemPath: string): b
   return currentPath === itemPath || currentPath.startsWith(`${itemPath}/`);
 }
 
-export function isSchoolAdminFeatureLocked(
+export function getControlledPortalFeatureTarget(
   role: PortalRole | null | undefined,
   currentPath: string,
+): ControlledPortalFeatureTarget | null {
+  for (const target of CONTROLLED_PORTAL_FEATURE_TARGETS) {
+    if (isPortalMenuPathActive(currentPath, getPortalPath(role, target))) {
+      return target;
+    }
+  }
+  return null;
+}
+
+export function isFeatureGateControlledRole(role: PortalRole | null | undefined): boolean {
+  return role === 'admin' || role === 'sales';
+}
+
+export function isPortalFeatureLocked(
+  role: PortalRole | null | undefined,
+  currentPath: string,
+  featureAccess: Partial<Record<ControlledPortalFeatureTarget, boolean>>,
 ): boolean {
-  if (role !== 'admin') {
+  if (!isFeatureGateControlledRole(role)) {
     return false;
   }
 
-  return SCHOOL_ADMIN_LOCKED_TARGETS.some((target) =>
-    isPortalMenuPathActive(currentPath, getPortalPath(role, target)),
-  );
+  const target = getControlledPortalFeatureTarget(role, currentPath);
+  if (!target) {
+    return false;
+  }
+
+  return featureAccess[target] === false;
 }
 
 export function getPortalRouteLocation(

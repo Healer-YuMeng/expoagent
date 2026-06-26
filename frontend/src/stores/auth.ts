@@ -2,7 +2,6 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { login as loginApi, createAnonymousSession } from '@/api/auth';
 import type { User, LoginRequest, AnonymousSessionResponse } from '@/types';
-import router from '@/router';
 import { getAppStorageItem, removeAppStorageItem, setAppStorageItem } from '@/utils/browserStorage';
 import { getPortalHomePath } from '@/router/portalRoutes';
 import {
@@ -15,6 +14,11 @@ import {
   loadAdminAuthStorage,
   persistAdminAuthStorage,
 } from '@/utils/adminAuthStorage';
+
+async function navigateTo(path: string) {
+  const routerModule = await import('@/router');
+  await routerModule.default.push(path);
+}
 
 export const useAuthStore = defineStore('auth', () => {
   const adminAuthSnapshot = loadAdminAuthStorage(window.sessionStorage, window.localStorage);
@@ -95,9 +99,9 @@ export const useAuthStore = defineStore('auth', () => {
       // 根据角色跳转到不同页面
       if (response.user.role === 'sales' || response.user.role === 'admin' || response.user.role === 'super_admin') {
         const fallbackPath = getPortalHomePath(response.user.role);
-        router.push(resolvePostLoginPath(redirectPath, fallbackPath));
+        await navigateTo(resolvePostLoginPath(redirectPath, fallbackPath));
       } else {
-        router.push('/start-chat');
+        await navigateTo('/start-chat');
       }
     } catch (error) {
       console.error('Login failed:', error);
@@ -132,7 +136,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function logout() {
     clearAuth();
-    router.push('/auth/login');
+    void navigateTo('/auth/login');
   }
 
   if (token.value && user.value) {

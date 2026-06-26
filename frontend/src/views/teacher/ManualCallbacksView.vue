@@ -58,8 +58,10 @@ import type { ManualCallbackItem } from '@/types';
 import { ElMessage } from 'element-plus';
 import { useAuthStore } from '@/stores/auth';
 import { getPortalConversationPath, getPortalLeadDetailPath } from '@/router/portalRoutes';
+import { useFeatureGateBootstrap } from '@/composables/useFeatureGateBootstrap';
 
 const { t } = useI18n();
+useFeatureGateBootstrap();
 
 const callbacks = ref<ManualCallbackItem[]>([]);
 const loading = ref(false);

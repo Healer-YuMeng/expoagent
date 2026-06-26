@@ -5,6 +5,14 @@ import request from '@/utils/request';
 import type { ManualCallbackItem } from '@/types';
 import type { Message } from '@/types/message';
 
+export type ControlledPortalFeatureTarget =
+  | 'manualCallbacks'
+  | 'systemPrompt'
+  | 'userManagement'
+  | 'systemSettings';
+
+export type FeatureGateModules = Record<ControlledPortalFeatureTarget, boolean>;
+
 export interface ChannelMetricEntry {
   channel: string;
   label: string;
@@ -35,6 +43,10 @@ export interface TranslateResponse {
   failed_languages?: string[];
 }
 
+export interface FeatureGateSettingsResponse {
+  modules: Partial<FeatureGateModules>;
+}
+
 /**
  * 获取老师工作台摘要数据
  */
@@ -54,6 +66,17 @@ export function translateWelcomeMessage(data: TranslateRequest): Promise<Transla
   return request.post('/v1/expo-system/settings/welcome-message/translate', data, {
     timeout: 120000,
   });
+}
+
+export function getTeacherFeatureGates(): Promise<FeatureGateSettingsResponse> {
+  return request.get('/v1/expo-system/settings/feature-gates');
+}
+
+export function updateTeacherFeatureGate(
+  module: ControlledPortalFeatureTarget,
+  enabled: boolean,
+): Promise<FeatureGateSettingsResponse> {
+  return request.patch('/v1/expo-system/settings/feature-gates', { module, enabled });
 }
 
 export function getManualCallbacks(): Promise<{ items: ManualCallbackItem[] }> {

@@ -5,6 +5,7 @@ import ParentLayout from '@/components/ParentLayout.vue';
 import i18n from '@/i18n';
 import { getAppStorageItem } from '@/utils/browserStorage';
 import { getPortalHomePath } from './portalRoutes';
+import { useFeatureGateStore } from '@/stores/featureGate';
 
 const routes = [
   {
@@ -202,7 +203,7 @@ const router = createRouter({
 });
 
 // 全局路由守卫
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore();
   if (!authStore.ensureValidSession()) {
     if (to.meta.requiresAuth) {
@@ -228,6 +229,13 @@ router.beforeEach((to, _from, next) => {
     }
     next({ name: 'NotFound' });
   } else {
+    if (to.meta.requiresAuth && (userRole === 'super_admin' || userRole === 'admin' || userRole === 'sales')) {
+      try {
+        await useFeatureGateStore().fetchFeatureGates(true);
+      } catch (error) {
+        console.error('Failed to preload feature gates before route enter:', error);
+      }
+    }
     next();
   }
 });

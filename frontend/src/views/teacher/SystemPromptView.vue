@@ -124,8 +124,10 @@ import {
 } from '@/api/teacher';
 import { useAuthStore } from '@/stores/auth';
 import { formatChinaDateTime } from '@/utils/time';
+import { useFeatureGateBootstrap } from '@/composables/useFeatureGateBootstrap';
 
 const authStore = useAuthStore();
+useFeatureGateBootstrap();
 const authRole = computed(() => authStore.userRole);
 const effectiveSchoolId = computed(() => {
   if (authRole.value === 'admin') {

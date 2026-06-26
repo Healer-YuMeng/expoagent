@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, reactive } from 'vue';
-import { getLeads, deleteLead } from '@/api/lead';
+import { getLeads, deleteLead, bulkDeleteLeads } from '@/api/lead';
 import type { LeadListItem, PaginatedLeads } from '@/types';
 import type { LeadFilters } from '@/api/lead';
 import { ElMessage } from 'element-plus';
@@ -17,7 +17,9 @@ export const useLeadStore = defineStore('lead', () => {
     language: 'zh-CN',
     tags: [],
     appointment_status: undefined,
-    wecom_status: undefined,
+    intended_product: '',
+    interest_level: '',
+    follow_up_owner_name: '',
     high_intent_only: undefined,
     manual_callback_only: undefined,
   });
@@ -61,6 +63,17 @@ export const useLeadStore = defineStore('lead', () => {
     }
   }
 
+  async function removeLeads(ids: string[]) {
+    try {
+      const response = await bulkDeleteLeads(ids);
+      ElMessage.success(response.message || '线索已批量删除');
+      await fetchLeads();
+    } catch (e) {
+      ElMessage.error('批量删除失败，请重试');
+      console.error(e);
+    }
+  }
+
   return {
     leads,
     total,
@@ -71,5 +84,6 @@ export const useLeadStore = defineStore('lead', () => {
     setFilters,
     setPage,
     removeLead,
+    removeLeads,
   };
 });

@@ -478,11 +478,11 @@ const goToManualCallbacks = () => {
 
 .stat-icon-panel {
   display: grid;
-  width: 52px;
-  height: 52px;
+  width: 72px;
+  height: 72px;
   margin-bottom: 18px;
   place-items: center;
-  border-radius: 16px;
+  border-radius: 22px;
 }
 
 .stat-icon-panel.slate {
@@ -506,7 +506,7 @@ const goToManualCallbacks = () => {
 }
 
 .stat-icon {
-  font-size: 26px;
+  font-size: 34px;
 }
 
 .stat-label {
