@@ -1,89 +1,6 @@
 <template>
   <div class="settings-view">
-    <!-- 页面标题 -->
-    <div class="page-header">
-      <h1 class="page-title">⚙️ {{ t('settings.title') }}</h1>
-      <button class="refresh-btn glass" @click="fetchWelcomeMessage" :disabled="loading">
-        <span class="btn-icon">🔄</span>
-        <span>{{ t('settings.refresh') }}</span>
-      </button>
-    </div>
-
-    <!-- 错误提示 -->
-    <div v-if="error" class="error-alert glass">
-      <div class="error-icon">⚠️</div>
-      <div class="error-text">{{ error }}</div>
-    </div>
-
-    <!-- 设置表单 -->
-    <div class="settings-section glass">
-      <div class="section-title">💬 {{ t('settings.welcomeMessageTitle') }}</div>
-      <div class="section-description">
-        {{ t('settings.welcomeMessageDesc') }}
-      </div>
-      
-      <!-- AI翻译按钮 -->
-      <div class="ai-translate-section">
-        <div class="translate-hint">
-          <span class="hint-icon">🤖</span>
-          <span>{{ t('settings.aiTranslateHint') }}</span>
-        </div>
-        <button
-          class="translate-btn glass"
-          :class="{ loading: translating }"
-          :disabled="translating || !welcomeMessages['zh-CN']?.trim()"
-          @click="handleAITranslate"
-        >
-          <span v-if="!translating" class="btn-icon">🌐</span>
-          <span v-if="translating" class="loader"></span>
-          <span>{{ translating ? t('settings.translating') : t('settings.aiTranslateButton') }}</span>
-        </button>
-      </div>
-
-      <!-- 多语言标签页 -->
-      <div class="language-tabs">
-        <button
-          v-for="lang in languages"
-          :key="lang.code"
-          class="tab-btn"
-          :class="{ active: currentLanguage === lang.code }"
-          @click="currentLanguage = lang.code"
-        >
-          <span class="tab-flag">{{ lang.flag }}</span>
-          <span class="tab-name">{{ lang.name }}</span>
-        </button>
-      </div>
-
-      <!-- 当前语言的输入框 -->
-      <div class="language-input-section">
-        <div class="language-label">
-          <span class="label-icon">✏️</span>
-          <span>{{ getCurrentLanguageName() }}</span>
-        </div>
-        <textarea
-          v-model="welcomeMessages[currentLanguage]"
-          class="form-textarea"
-          rows="10"
-          :placeholder="getPlaceholderForLanguage(currentLanguage)"
-        ></textarea>
-      </div>
-      
-      <div class="form-hint">
-        <span class="hint-icon">💡</span>
-        <span>{{ t('settings.hint') }}</span>
-      </div>
-
-      <button
-        class="save-btn"
-        :class="{ loading: saving }"
-        :disabled="saving"
-        @click="handleSave"
-      >
-        <span v-if="!saving" class="btn-icon">💾</span>
-        <span v-if="saving" class="loader"></span>
-        <span>{{ saving ? t('settings.saving') : t('settings.saveButton') }}</span>
-      </button>
-    </div>
+    <TeacherPageHeader :title="t('settings.title')" />
 
     <div class="settings-section glass">
       <div class="section-title">📱 {{ t('settings.channelQrTitle') }}</div>
@@ -149,36 +66,15 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
 import { ElMessage } from 'element-plus';
-import type { AxiosError } from 'axios';
-import { getWelcomeMessage, updateWelcomeMessage, translateWelcomeMessage } from '@/api/teacher';
 import { useI18n } from 'vue-i18n';
 import QRCode from 'qrcode';
 import { CHANNELS, buildChannelUrl, buildStartChatEntryUrl, type ChannelSlug } from '@/utils/channelSource';
 import { useAuthStore } from '@/stores/auth';
 import { useFeatureGateBootstrap } from '@/composables/useFeatureGateBootstrap';
+import TeacherPageHeader from '@/components/TeacherPageHeader.vue';
 
 const { t } = useI18n();
 useFeatureGateBootstrap();
-
-// 多语言配置
-const languages = [
-  { code: 'zh-CN', name: '简体中文', flag: '🇨🇳' },
-  { code: 'en', name: 'English', flag: '🇬🇧' },
-  { code: 'zh-TW', name: '繁體中文', flag: '🇹🇼' },
-  { code: 'ja', name: '日本語', flag: '🇯🇵' },
-  { code: 'ko', name: '한국어', flag: '🇰🇷' },
-  { code: 'fr', name: 'Français', flag: '🇫🇷' },
-  { code: 'es', name: 'Español', flag: '🇪🇸' },
-  { code: 'ru', name: 'Русский', flag: '🇷🇺' },
-];
-
-// 状态
-const welcomeMessages = ref<Record<string, string>>({});
-const currentLanguage = ref('zh-CN');
-const loading = ref(false);
-const saving = ref(false);
-const translating = ref(false);
-const error = ref<string | null>(null);
 const channels = CHANNELS; // TODO: replace with backend-provided channel list when API is ready
 const qrBaseUrl = ref<string>(window.location.origin);
 const qrPreviews = ref<Partial<Record<ChannelSlug, { url: string; dataUrl: string | null }>>>({});
@@ -190,123 +86,6 @@ const channelLabelMap: Record<ChannelSlug, string> = {
   wb: 'dashboard.sources.weibo',
   gzh: 'dashboard.sources.wechatOfficialAccount',
   wxsp: 'dashboard.sources.wechatVideo',
-};
-
-function resolveRequestErrorMessage(err: unknown, fallback: string): string {
-  const axiosError = err as AxiosError<{ detail?: string }>;
-  return axiosError?.response?.data?.detail || fallback;
-}
-
-function resolveLanguageName(code: string): string {
-  return languages.find((lang) => lang.code === code)?.name || code;
-}
-
-// 获取当前语言的名称
-const getCurrentLanguageName = () => {
-  const lang = languages.find((l) => l.code === currentLanguage.value);
-  return lang ? lang.name : currentLanguage.value;
-};
-
-// 获取每个语言的占位符文本
-const getPlaceholderForLanguage = (langCode: string): string => {
-  const placeholders: Record<string, string> = {
-    'zh-CN': '请输入简体中文欢迎语...',
-    'zh-TW': '請輸入繁體中文歡迎語...',
-    'en': 'Enter welcome message in English...',
-    'ja': '日本語でウェルカムメッセージを入力してください...',
-    'ko': '한국어로 환영 메시지를 입력하세요...',
-    'fr': 'Entrez le message de bienvenue en français...',
-    'es': 'Ingrese el mensaje de bienvenida en español...',
-    'ru': 'Введите приветственное сообщение на русском...',
-  };
-  return placeholders[langCode] || `Enter welcome message in ${langCode}...`;
-};
-
-// 获取欢迎语
-const fetchWelcomeMessage = async () => {
-  loading.value = true;
-  error.value = null;
-  try {
-    const response = await getWelcomeMessage();
-    welcomeMessages.value = response.messages || {};
-    
-    // 确保所有语言都有初始值（避免undefined）
-    languages.forEach((lang) => {
-      if (!welcomeMessages.value[lang.code]) {
-        welcomeMessages.value[lang.code] = '';
-      }
-    });
-  } catch (err) {
-    console.error(err);
-    error.value = t('settings.errorLoad');
-  } finally {
-    loading.value = false;
-  }
-};
-
-// AI自动翻译
-const handleAITranslate = async () => {
-  const sourceText = welcomeMessages.value['zh-CN']?.trim();
-  if (!sourceText) {
-    ElMessage.warning(t('settings.emptySourceWarning'));
-    return;
-  }
-
-  translating.value = true;
-  try {
-    const response = await translateWelcomeMessage({
-      source_text: sourceText,
-      source_lang: 'zh-CN',
-    });
-
-    const translatedMessages: Record<string, string> = {
-      'zh-CN': sourceText,
-    };
-    languages.forEach((lang) => {
-      if (lang.code !== 'zh-CN') {
-        translatedMessages[lang.code] = '';
-      }
-    });
-    Object.assign(translatedMessages, response.translations || {});
-    welcomeMessages.value = {
-      ...welcomeMessages.value,
-      ...translatedMessages,
-    };
-
-    if (response.failed_languages?.length) {
-      const failedNames = response.failed_languages.map(resolveLanguageName).join('、');
-      ElMessage.warning(`以下语言翻译失败：${failedNames}`);
-    } else {
-      ElMessage.success(t('settings.translateSuccess'));
-    }
-  } catch (err) {
-    console.error(err);
-    ElMessage.error(resolveRequestErrorMessage(err, t('settings.translateError')));
-  } finally {
-    translating.value = false;
-  }
-};
-
-// 保存设置
-const handleSave = async () => {
-  // 检查至少有一个语言有内容
-  const hasContent = Object.values(welcomeMessages.value).some((msg) => msg?.trim());
-  if (!hasContent) {
-    ElMessage.warning(t('settings.emptyWarning'));
-    return;
-  }
-
-  saving.value = true;
-  try {
-    const response = await updateWelcomeMessage({ messages: welcomeMessages.value });
-    welcomeMessages.value = response.messages;
-    ElMessage.success(t('settings.saveSuccess'));
-  } catch (err) {
-    console.error(err);
-    ElMessage.error(resolveRequestErrorMessage(err, t('settings.saveError')));
-  } finally {
-    saving.value = false;
-  }
 };
 
 const generateQrForChannel = async (slug: ChannelSlug) => {
@@ -386,7 +165,6 @@ watch(() => qrBaseUrl.value, () => {
 });
 
 onMounted(() => {
-  void fetchWelcomeMessage();
   void refreshAllQrs();
 });
 </script>
@@ -418,56 +196,6 @@ onMounted(() => {
   font-weight: 700;
   color: #2c3e50;
   margin: 0;
-}
-
-.refresh-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 24px;
-  border-radius: 12px;
-  border: none;
-  color: #2c3e50;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.refresh-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.4);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-}
-
-.refresh-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-icon {
-  font-size: 16px;
-}
-
-/* 错误提示 */
-.error-alert {
-  margin-bottom: 20px;
-  padding: 20px 25px;
-  border-radius: 15px;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  border-left: 4px solid #e74c3c;
-}
-
-.error-icon {
-  font-size: 24px;
-}
-
-.error-text {
-  color: #c0392b;
-  font-weight: 500;
-  flex: 1;
 }
 
 /* 设置区域 */

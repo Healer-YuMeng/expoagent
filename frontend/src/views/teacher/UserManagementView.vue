@@ -1,16 +1,14 @@
 <template>
   <div class="user-mgmt">
-    <header class="page-header">
-      <div>
-        <h1 class="title">{{ t('teacher.users.title') }}</h1>
-        <p class="subtitle">{{ t('teacher.users.subtitle') }}</p>
-      </div>
-      <button class="primary" @click="createUser" :disabled="creating">
-        {{ creating ? t('teacher.users.creating') : `➕ ${t('teacher.users.createAction')}` }}
-      </button>
-    </header>
+    <TeacherPageHeader :title="t('teacher.users.title')" />
 
     <section class="card">
+      <div class="card-toolbar">
+        <button class="primary" @click="createUser" :disabled="creating">
+          {{ creating ? t('teacher.users.creating') : `➕ ${t('teacher.users.createAction')}` }}
+        </button>
+      </div>
+
       <div class="form-grid">
         <label>
           {{ t('teacher.users.accountLabel') }}
@@ -83,6 +81,7 @@ import { useAuthStore } from '@/stores/auth';
 import { listManagedUsers, createManagedUser, deleteManagedUser, type ManagedUser } from '@/api/teacher';
 import { useI18n } from 'vue-i18n';
 import { useFeatureGateBootstrap } from '@/composables/useFeatureGateBootstrap';
+import TeacherPageHeader from '@/components/TeacherPageHeader.vue';
 
 const authStore = useAuthStore();
 useFeatureGateBootstrap();
@@ -168,19 +167,11 @@ onMounted(() => {
 .user-mgmt {
   display: flex;
   flex-direction: column;
-  gap: 16px;
 }
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #fff;
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+
+.user-mgmt > .card + .card {
+  margin-top: 16px;
 }
-.title { margin: 0; font-size: 22px; }
-.subtitle { margin: 4px 0 0; color: #666; }
 .primary {
   background: linear-gradient(135deg, #0077ff, #00c6ff);
   color: #fff;
@@ -194,6 +185,11 @@ onMounted(() => {
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+}
+.card-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
 }
 .form-grid {
   display: grid;

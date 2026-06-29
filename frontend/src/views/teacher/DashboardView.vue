@@ -1,5 +1,7 @@
 <template>
   <div class="dashboard-container">
+    <TeacherPageHeader :title="t('teacher.layout.menu.dashboard')" />
+
     <div class="stats-grid">
       <div class="stat-card" v-loading="loading">
         <div class="stat-icon-panel slate">
@@ -48,26 +50,22 @@
     <div class="charts-section">
       <div class="chart-card">
         <div class="chart-header">
-          <h3 class="chart-title">{{ t('dashboard.consultationSource') }}</h3>
+          <div class="chart-title-wrap">
+            <h3 class="chart-title">{{ t('dashboard.productDistribution') }}</h3>
+            <span class="chart-dev-badge">{{ t('dashboard.comingSoon') }}</span>
+          </div>
           <div class="chart-actions">
             <button
-              v-for="period in sourcePeriods"
+              v-for="period in productPeriods"
               :key="period"
-              :class="['period-btn', { active: selectedSourcePeriod === period }]"
-              @click="selectedSourcePeriod = period"
+              :class="['period-btn', { active: selectedProductPeriod === period }]"
+              @click="selectedProductPeriod = period"
             >
               {{ t(`dashboard.period.${period}`) }}
             </button>
           </div>
         </div>
         <div ref="sourceChartRef" class="chart-container"></div>
-      </div>
-
-      <div class="chart-card">
-        <div class="chart-header">
-          <h3 class="chart-title">{{ t('dashboard.userFocus') }}</h3>
-        </div>
-        <div ref="radarChartRef" class="chart-container"></div>
       </div>
     </div>
   </div>
@@ -84,6 +82,7 @@ import * as echarts from 'echarts';
 import type { ECharts } from 'echarts';
 import { useAuthStore } from '@/stores/auth';
 import { getPortalPath } from '@/router/portalRoutes';
+import TeacherPageHeader from '@/components/TeacherPageHeader.vue';
 
 const dashboardStore = useDashboardStore();
 const { t, locale } = useI18n();
@@ -92,38 +91,41 @@ const router = useRouter();
 const authStore = useAuthStore();
 
 const sourceChartRef = ref<HTMLElement>();
-const radarChartRef = ref<HTMLElement>();
 let sourceChart: ECharts | null = null;
-let radarChart: ECharts | null = null;
-type SourcePeriod = 'daily' | 'monthly' | 'yearly';
-const sourcePeriods: SourcePeriod[] = ['daily', 'monthly', 'yearly'];
-const selectedSourcePeriod = ref<SourcePeriod>('daily');
-const radarValues = [92, 88, 85, 78, 75, 82, 86];
-const channelOrder = ['xhs', 'dy', 'blbl', 'wb', 'gzh', 'wxsp'];
-const channelLabelKeys: Record<string, string> = {
-  xhs: 'dashboard.sources.xiaohongshu',
-  dy: 'dashboard.sources.douyin',
-  blbl: 'dashboard.sources.bilibili',
-  wb: 'dashboard.sources.weibo',
-  gzh: 'dashboard.sources.wechatOfficialAccount',
-  wxsp: 'dashboard.sources.wechatVideo',
+type ProductPeriod = 'daily' | 'monthly' | 'yearly';
+const productPeriods: ProductPeriod[] = ['daily', 'monthly', 'yearly'];
+const selectedProductPeriod = ref<ProductPeriod>('daily');
+const productDataMap: Record<ProductPeriod, Array<{ name: string; count: number }>> = {
+  daily: [
+    { name: 'AI 获客方案', count: 12 },
+    { name: '智慧展台', count: 9 },
+    { name: '数字导览屏', count: 7 },
+    { name: '会务小程序', count: 5 },
+    { name: '客户管理系统', count: 4 },
+  ],
+  monthly: [
+    { name: 'AI 获客方案', count: 38 },
+    { name: '智慧展台', count: 31 },
+    { name: '数字导览屏', count: 26 },
+    { name: '客户管理系统', count: 21 },
+    { name: '会务小程序', count: 18 },
+  ],
+  yearly: [
+    { name: 'AI 获客方案', count: 286 },
+    { name: '智慧展台', count: 248 },
+    { name: '客户管理系统', count: 205 },
+    { name: '数字导览屏', count: 192 },
+    { name: '会务小程序', count: 168 },
+  ],
 };
 
 onMounted(() => {
   dashboardStore.fetchDashboardStats();
   initSourceChart();
-  initRadarChart();
   window.addEventListener('resize', handleResize);
 });
 
-watch(
-  () => stats.value?.source_stats,
-  () => {
-    updateSourceChart();
-  }
-);
-
-watch(selectedSourcePeriod, () => {
+watch(selectedProductPeriod, () => {
   updateSourceChart();
 });
 
@@ -131,7 +133,6 @@ watch(
   () => locale.value,
   () => {
     updateSourceChart();
-    updateRadarChart();
   }
 );
 
@@ -140,17 +141,11 @@ onUnmounted(() => {
   if (sourceChart) {
     sourceChart.dispose();
   }
-  if (radarChart) {
-    radarChart.dispose();
-  }
 });
 
 const handleResize = () => {
   if (sourceChart) {
     sourceChart.resize();
-  }
-  if (radarChart) {
-    radarChart.resize();
   }
 };
 
@@ -171,23 +166,8 @@ const initSourceChart = () => {
   sourceChart.setOption({
     tooltip: {
       ...baseTooltip,
-      trigger: 'axis',
-      axisPointer: {
-        type: 'shadow',
-      },
-    },
-    legend: {
-      data: [t('dashboard.visit'), t('dashboard.appointment')],
-      top: 10,
-      right: 18,
-      textStyle: {
-        color: '#6a7890',
-        fontSize: 13,
-        fontWeight: 600,
-      },
-      itemWidth: 16,
-      itemHeight: 10,
-      itemGap: 18,
+      trigger: 'item',
+      formatter: (params: any) => `${params.name}<br/>${t('dashboard.consultationCount')}：${params.value}`,
     },
     grid: {
       left: '4%',
@@ -198,7 +178,7 @@ const initSourceChart = () => {
     },
     xAxis: {
       type: 'category',
-      data: getChannelLabels(),
+      data: getProductLabels(),
       axisLine: {
         lineStyle: {
           color: '#d9e1ec',
@@ -236,50 +216,22 @@ const initSourceChart = () => {
     },
     series: [
       {
-        name: t('dashboard.visit'),
+        name: t('dashboard.consultationCount'),
         type: 'bar',
-        data: getSeriesData('visits'),
-        barWidth: '28%',
+        data: getProductSeriesData(),
+        barWidth: '42%',
         itemStyle: {
           borderRadius: [8, 8, 0, 0],
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: '#94a3b8' },
-            { offset: 1, color: '#7c8ea7' },
+            { offset: 0, color: '#95baf8' },
+            { offset: 1, color: '#5d8ef2' },
           ]),
         },
         emphasis: {
           itemStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: '#7f90a8' },
-              { offset: 1, color: '#6d7f98' },
-            ]),
-          },
-        },
-        label: {
-          show: true,
-          position: 'top',
-          color: '#4e5b6d',
-          fontSize: 12,
-          fontWeight: 600,
-        },
-      },
-      {
-        name: t('dashboard.appointment'),
-        type: 'bar',
-        data: getSeriesData('appointments'),
-        barWidth: '28%',
-        itemStyle: {
-          borderRadius: [8, 8, 0, 0],
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: '#7ee0b0' },
-            { offset: 1, color: '#5ecf9d' },
-          ]),
-        },
-        emphasis: {
-          itemStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: '#6fd6a8' },
-              { offset: 1, color: '#4ebd8d' },
+              { offset: 0, color: '#7ea9f2' },
+              { offset: 1, color: '#4f80e9' },
             ]),
           },
         },
@@ -297,133 +249,16 @@ const initSourceChart = () => {
   updateSourceChart();
 };
 
-const getChannelLabels = () => channelOrder.map((slug) => t(channelLabelKeys[slug] ?? slug));
+const getProductLabels = () => productDataMap[selectedProductPeriod.value].map((item) => item.name);
 
-const getSeriesData = (metric: 'visits' | 'appointments') => {
-  const periodStats = stats.value?.source_stats?.[selectedSourcePeriod.value] ?? [];
-  return channelOrder.map((slug) => {
-    const entry = periodStats.find((item) => item.channel === slug);
-    if (!entry) return 0;
-    return metric === 'visits' ? entry.visits : entry.appointments;
-  });
-};
-
-const getRadarIndicators = () => [
-  { name: t('dashboard.teachingStaff'), max: 100 },
-  { name: t('dashboard.enrollment'), max: 100 },
-  { name: t('dashboard.environment'), max: 100 },
-  { name: t('dashboard.food'), max: 100 },
-  { name: t('dashboard.accommodation'), max: 100 },
-  { name: t('dashboard.facilities'), max: 100 },
-  { name: t('dashboard.tuition'), max: 100 },
-];
-
-const getRadarSeriesItem = () => ({
-  value: radarValues,
-  name: t('dashboard.userAttention'),
-  areaStyle: {
-    color: new echarts.graphic.RadialGradient(0.5, 0.5, 1, [
-      { offset: 0, color: 'rgba(148, 163, 184, 0.28)' },
-      { offset: 1, color: 'rgba(148, 163, 184, 0.08)' },
-    ]),
-  },
-  lineStyle: {
-    color: '#7d8ea7',
-    width: 2.5,
-  },
-  itemStyle: {
-    color: '#7d8ea7',
-    borderColor: '#ffffff',
-    borderWidth: 2,
-  },
-  label: {
-    show: true,
-    formatter: (params: any) => params.value,
-    color: '#526071',
-    fontSize: 13,
-    fontWeight: 600,
-  },
-});
+const getProductSeriesData = () => productDataMap[selectedProductPeriod.value].map((item) => item.count);
 
 const updateSourceChart = () => {
   if (!sourceChart) return;
   sourceChart.setOption({
-    legend: {
-      data: [t('dashboard.visit'), t('dashboard.appointment')],
-    },
-    xAxis: { data: getChannelLabels() },
+    xAxis: { data: getProductLabels() },
     series: [
-      { name: t('dashboard.visit'), data: getSeriesData('visits') },
-      { name: t('dashboard.appointment'), data: getSeriesData('appointments') },
-    ],
-  });
-};
-
-const initRadarChart = () => {
-  if (!radarChartRef.value) return;
-
-  radarChart = echarts.init(radarChartRef.value);
-
-  radarChart.setOption({
-    tooltip: {
-      ...baseTooltip,
-      trigger: 'item',
-    },
-    radar: {
-      indicator: getRadarIndicators(),
-      shape: 'polygon',
-      splitNumber: 4,
-      radius: '68%',
-      center: ['50%', '52%'],
-      axisName: {
-        color: '#5d6c82',
-        fontSize: 15,
-        fontWeight: 600,
-      },
-      splitLine: {
-        lineStyle: {
-          color: '#dde5ef',
-        },
-      },
-      splitArea: {
-        show: true,
-        areaStyle: {
-          color: [
-            'rgba(148, 163, 184, 0.05)',
-            'rgba(148, 163, 184, 0.08)',
-            'rgba(148, 163, 184, 0.12)',
-            'rgba(148, 163, 184, 0.16)',
-          ],
-        },
-      },
-      axisLine: {
-        lineStyle: {
-          color: '#d6deea',
-        },
-      },
-    },
-    series: [
-      {
-        name: t('dashboard.attention'),
-        type: 'radar',
-        data: [getRadarSeriesItem()],
-      },
-    ],
-  });
-};
-
-const updateRadarChart = () => {
-  if (!radarChart) return;
-  radarChart.setOption({
-    radar: {
-      indicator: getRadarIndicators(),
-    },
-    series: [
-      {
-        name: t('dashboard.attention'),
-        type: 'radar',
-        data: [getRadarSeriesItem()],
-      },
+      { name: t('dashboard.consultationCount'), data: getProductSeriesData() },
     ],
   });
 };
@@ -567,7 +402,7 @@ const goToManualCallbacks = () => {
 
 .charts-section {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 18px;
 }
 
@@ -587,10 +422,29 @@ const goToManualCallbacks = () => {
   margin-bottom: 20px;
 }
 
+.chart-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .chart-title {
   margin: 0;
   color: #1f2937;
   font-size: 20px;
+  font-weight: 700;
+}
+
+.chart-dev-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #edf3ff;
+  color: #5474ae;
+  font-size: 12px;
   font-weight: 700;
 }
 

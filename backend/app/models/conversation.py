@@ -36,7 +36,6 @@ class ConversationSchema(BaseModel):
     ai_reply_auto_resume_pending: bool = Field(default=False, description="是否等待自动恢复 AI")
     appointment: Optional[AppointmentInfo] = Field(default=None, description="预约信息")
     source_channel: Optional[str] = Field(default=None, description="渠道来源缩写")
-    channel_appointment_logged: bool = Field(default=False, description="是否已记录渠道预约")
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

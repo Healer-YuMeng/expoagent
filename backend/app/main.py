@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.db import ensure_default_admin_accounts
 
 # 导入所有路由
-from app.routers import agent, assistants, auth, parent, leads, teacher, wecom, channel_metrics, docs, prompts, users
+from app.routers import agent, assistants, auth, parent, leads, teacher, wecom, docs, prompts, users
 
 # 配置日志过滤器，减少 /metrics 端点的日志噪音
 class MetricsFilter(logging.Filter):
@@ -75,7 +75,6 @@ app.include_router(parent.router)
 app.include_router(leads.router)
 app.include_router(teacher.router)
 app.include_router(wecom.router)
-app.include_router(channel_metrics.router)
 app.include_router(docs.router)
 app.include_router(prompts.router)
 app.include_router(assistants.router)

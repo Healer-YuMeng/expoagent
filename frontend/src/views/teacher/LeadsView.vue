@@ -1,12 +1,6 @@
 <template>
   <div class="leads-view">
-    <!-- 页面标题 -->
-    <div class="page-header">
-      <h1 class="page-title">
-        <span>{{ t('leads.title') }}</span>
-        <span class="total-count total-count--inline">{{ t('leads.totalCount', { count: total }) }}</span>
-      </h1>
-    </div>
+    <TeacherPageHeader :title="t('leads.title')" :meta-text="t('leads.totalCount', { count: total })" />
 
     <!-- 快捷筛选按钮和搜索框 -->
     <div class="filter-section">
@@ -39,13 +33,13 @@
         </div>
 
         <div class="toolbar-actions">
-          <button class="filter-btn secondary" @click="resetFilters">
-            <el-icon class="btn-icon"><RefreshRight /></el-icon>
-            <span>{{ t('common.reset') }}</span>
-          </button>
-          <button class="filter-btn dark" @click="handleExport" :disabled="exporting">
+          <button class="filter-btn utility-btn" @click="handleExport" :disabled="exporting">
             <el-icon class="btn-icon"><Download /></el-icon>
             <span>{{ exporting ? t('leads.exportingExcel') : t('leads.exportExcel') }}</span>
+          </button>
+          <button class="filter-btn utility-btn danger-lite" :disabled="!canBulkDelete" @click="handleBulkDelete">
+            <el-icon class="btn-icon"><Delete /></el-icon>
+            <span>{{ t('leads.bulkDelete') }}</span>
           </button>
         </div>
       </div>
@@ -113,13 +107,13 @@
         </div>
 
         <div class="advanced-filter-actions">
-          <button class="filter-btn primary" @click="applyFilters">
+          <button class="filter-btn utility-btn" @click="applyFilters">
             <el-icon class="btn-icon"><Search /></el-icon>
             <span>{{ t('common.search') }}</span>
           </button>
-          <button class="filter-btn danger" :disabled="!canBulkDelete" @click="handleBulkDelete">
-            <el-icon class="btn-icon"><Delete /></el-icon>
-            <span>{{ t('leads.bulkDelete') }}</span>
+          <button class="filter-btn utility-btn" @click="resetFilters">
+            <el-icon class="btn-icon"><RefreshRight /></el-icon>
+            <span>{{ t('common.reset') }}</span>
           </button>
         </div>
       </div>
@@ -289,6 +283,7 @@ import {
   Tickets,
   Warning,
 } from '@element-plus/icons-vue';
+import TeacherPageHeader from '@/components/TeacherPageHeader.vue';
 import { exportLeads as exportLeadsApi } from '@/api/lead';
 import { useAuthStore } from '@/stores/auth';
 import { getPortalLeadDetailPath } from '@/router/portalRoutes';
@@ -795,6 +790,7 @@ watch(
   gap: 10px;
   align-items: center;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .advanced-filter-bar {
@@ -842,7 +838,7 @@ watch(
 
 .search-input-wrap:focus-within {
   border-color: #243041;
-  box-shadow: 0 0 0 3px rgba(36, 48, 65, 0.08);
+  box-shadow: none;
 }
 
 .search-input-icon {
@@ -880,6 +876,7 @@ watch(
 :deep(.filter-select .el-select__wrapper) {
   min-height: 44px;
   border-radius: 14px;
+  border: 1px solid #d9e3ee;
   box-shadow: none;
   background: #ffffff;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
@@ -887,7 +884,7 @@ watch(
 
 :deep(.filter-select .el-select__wrapper.is-focused) {
   border-color: #243041;
-  box-shadow: 0 0 0 3px rgba(36, 48, 65, 0.08);
+  box-shadow: none;
 }
 
 :deep(.filter-select .el-select__placeholder),
@@ -911,44 +908,39 @@ watch(
   white-space: nowrap;
 }
 
-.filter-btn.primary {
-  background: #3697dd;
-  color: #ffffff;
-  box-shadow: 0 8px 18px rgba(54, 151, 221, 0.18);
+.filter-btn.utility-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-color: #d9e3ee;
+  background: #ffffff;
+  color: #6f8098;
+  box-shadow: 0 3px 12px rgba(22, 34, 51, 0.04);
 }
 
-.filter-btn.primary:hover {
-  background: #2d8acf;
+.filter-btn.utility-btn:hover {
+  border-color: #c3d0e0;
+  background: #f4f7fb;
+  color: #42526b;
 }
 
-.filter-btn.secondary {
-  background: #f3f6f9;
-  border-color: #d7e0ea;
-  color: #6d7b8d;
-}
-
-.filter-btn.secondary:hover {
-  background: #eaf0f5;
-}
-
-.filter-btn.dark {
+.filter-btn.utility-btn:active,
+.filter-btn.utility-btn:focus-visible {
+  border-color: #202a39;
   background: #202a39;
   color: #ffffff;
-  box-shadow: 0 8px 18px rgba(32, 42, 57, 0.15);
+  outline: none;
+  box-shadow: 0 10px 20px rgba(32, 42, 57, 0.14);
 }
 
-.filter-btn.dark:hover {
-  background: #17202d;
-}
-
-.filter-btn.danger {
-  background: #fff1f0;
-  border-color: #ffd7d2;
+.filter-btn.danger-lite {
   color: #d65a51;
+  border-color: #f0d8d3;
 }
 
-.filter-btn.danger:hover {
-  background: #ffe7e4;
+.filter-btn.danger-lite:hover {
+  background: #fff6f4;
+  border-color: #eac2ba;
+  color: #c74b43;
 }
 
 .filter-btn:disabled {
@@ -1331,6 +1323,7 @@ watch(
 
   .toolbar-actions {
     width: 100%;
+    justify-content: flex-end;
   }
 
   .advanced-filter-grid {

@@ -22,7 +22,6 @@ from app.core.dependencies import get_current_parent
 from app.services.langchain_service import get_langchain_service, LangchainService
 from app.services import rag_search
 from app.routers.utils import build_lead_chat_lookup
-from app.services.channel_metrics import normalize_channel_source, record_channel_event
 from app.services.assistant_service import AssistantService
 from app.core.config import settings
 
@@ -103,6 +102,7 @@ class UpdateConversationAssistantRequest(BaseModel):
 
 
 VALID_CAMPUSES = {"浦东", "浦西", "临港"}
+VALID_CHANNEL_SOURCES = {"xhs", "dy", "blbl", "wb", "gzh", "wxsp"}
 APPOINTMENT_PATTERN = re.compile(r"\[\[APPOINTMENT\]\](\{.*?\})", re.DOTALL)
 APPOINTMENT_CONFIRMED_TAG = "预约已确认"
 DEFAULT_WELCOME_MESSAGES = {
@@ -118,6 +118,13 @@ DEFAULT_WELCOME_MESSAGES = {
 DEFAULT_WELCOME_MESSAGE = DEFAULT_WELCOME_MESSAGES["zh-CN"]
 PROFILE_COLLECTION = "conversation_profiles"
 SYSTEM_SETTINGS_COLLECTION = "system_settings"
+
+
+def normalize_channel_source(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    normalized = raw.strip().lower()
+    return normalized if normalized in VALID_CHANNEL_SOURCES else None
 
 
 async def _ensure_ai_reply_auto_resumed(
@@ -1219,17 +1226,9 @@ async def _postprocess_parent_reply(
         if campus in VALID_CAMPUSES:
             lead_tags.append(campus)
         source_channel = conversation.source_channel
-        channel_appointment_logged = bool(conv_snapshot.get("channel_appointment_logged"))
 
         if appointment_doc:
             lead_tags.append(APPOINTMENT_CONFIRMED_TAG)
-            if source_channel and not channel_appointment_logged:
-                await record_channel_event(db, source_channel, "appointment")
-                channel_appointment_logged = True
-                await db.conversations.update_one(
-                    {"_id": conv_id},
-                    {"$set": {"channel_appointment_logged": True}},
-                )
         if needs_manual_callback_flag:
             lead_tags.append(MANUAL_CALLBACK_TAG)
 
@@ -1334,14 +1333,6 @@ async def _postprocess_parent_reply(
                 existing_tags = existing_lead.get("tags", [])
                 updates["tags"] = _ensure_tag(existing_tags, APPOINTMENT_CONFIRMED_TAG)
                 updates["is_high_intent"] = True
-
-                if source_channel and not channel_appointment_logged:
-                    await record_channel_event(db, source_channel, "appointment")
-                    channel_appointment_logged = True
-                    await db.conversations.update_one(
-                        {"_id": conv_id},
-                        {"$set": {"channel_appointment_logged": True}},
-                    )
 
             if needs_manual_callback_flag:
                 updates["needs_manual_callback"] = True
@@ -1475,7 +1466,6 @@ async def create_conversation(
         "updated_at": now,
         "last_message_at": None,
         "appointment": None,
-        "channel_appointment_logged": False,
         "school_id": effective_school_id,
         "assistant_id": assistant.get("id") if assistant else request_data.assistant_id,
         "ai_reply_enabled": True,

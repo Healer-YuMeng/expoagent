@@ -1,13 +1,6 @@
 <template>
   <div class="callbacks-view">
-    <!-- 页面标题 -->
-    <div class="page-header">
-      <h1 class="page-title">{{ t('teacher.reminders.pageTitle') }}</h1>
-      <button class="refresh-btn glass" @click="reload">
-        <span class="btn-icon">🔄</span>
-        <span>{{ t('teacher.reminders.refresh') }}</span>
-      </button>
-    </div>
+    <TeacherPageHeader :title="t('teacher.layout.menu.manualCallbacks')" />
 
     <!-- 错误提示 -->
     <div v-if="error" class="error-alert glass">
@@ -17,6 +10,13 @@
 
     <!-- 提醒列表 -->
     <div class="callbacks-section glass" v-loading="loading">
+      <div class="callbacks-toolbar">
+        <button class="refresh-btn glass" @click="reload">
+          <span class="btn-icon">🔄</span>
+          <span>{{ t('teacher.reminders.refresh') }}</span>
+        </button>
+      </div>
+
       <div v-if="!loading && callbacks.length === 0" class="empty-state">
         <div class="empty-icon">✅</div>
         <div class="empty-text">{{ t('teacher.reminders.emptyState') }}</div>
@@ -59,6 +59,7 @@ import { ElMessage } from 'element-plus';
 import { useAuthStore } from '@/stores/auth';
 import { getPortalConversationPath, getPortalLeadDetailPath } from '@/router/portalRoutes';
 import { useFeatureGateBootstrap } from '@/composables/useFeatureGateBootstrap';
+import TeacherPageHeader from '@/components/TeacherPageHeader.vue';
 
 const { t } = useI18n();
 useFeatureGateBootstrap();
@@ -198,6 +199,12 @@ onMounted(() => {
   padding: 30px;
   border-radius: 20px;
   min-height: 400px;
+}
+
+.callbacks-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 18px;
 }
 
 .callbacks-list {
