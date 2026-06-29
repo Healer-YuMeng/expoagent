@@ -13,20 +13,12 @@ export type ControlledPortalFeatureTarget =
 
 export type FeatureGateModules = Record<ControlledPortalFeatureTarget, boolean>;
 
-export interface ChannelMetricEntry {
-  channel: string;
-  label: string;
-  visits: number;
-  appointments: number;
-}
-
 export interface DashboardStats {
   today_consultations: number;
   valid_leads: number;
   urgent_followups: number;
   pending_appointments: number;
   manual_callbacks: number;
-  source_stats?: Record<'daily' | 'monthly' | 'yearly', ChannelMetricEntry[]>;
 }
 
 export interface WelcomeMessageResponse {

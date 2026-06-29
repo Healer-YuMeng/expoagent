@@ -55,12 +55,25 @@
         </div>
         <div class="footer-action-row">
           <button class="language-btn" @click="toggleLanguage" :title="t('teacher.layout.language')">
-            <el-icon class="language-icon"><Promotion /></el-icon>
+            <span class="language-icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="8" cy="8" r="5.75" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M2.75 8H13.25" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M8 2.25C9.34 3.62 10.1 5.49 10.1 8C10.1 10.51 9.34 12.38 8 13.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M8 2.25C6.66 3.62 5.9 5.49 5.9 8C5.9 10.51 6.66 12.38 8 13.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </span>
             <span class="language-text">{{ locale === 'zh-CN' ? 'EN' : '中' }}</span>
           </button>
 
           <button class="logout-btn" @click="handleLogout" :title="t('teacher.layout.logout')">
-            <el-icon class="logout-icon"><SwitchButton /></el-icon>
+            <span class="logout-icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M6 3H3.75C3.06 3 2.5 3.56 2.5 4.25V11.75C2.5 12.44 3.06 13 3.75 13H6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M7.5 8H13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M10.5 5L13.5 8L10.5 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
             <span class="logout-text">{{ t('teacher.layout.logout') }}</span>
           </button>
         </div>
@@ -158,10 +171,8 @@ import {
   Histogram,
   MoreFilled,
   Postcard,
-  Promotion,
   Reading,
   Setting,
-  SwitchButton,
   User,
   UserFilled,
   Warning,
@@ -579,7 +590,7 @@ onUnmounted(() => {
   background: transparent;
   color: #314156;
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 500;
   cursor: pointer;
   transition:
     border-color 0.22s ease,
@@ -597,6 +608,19 @@ onUnmounted(() => {
 .language-icon,
 .logout-icon {
   font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logout-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.language-icon svg {
+  width: 18px;
+  height: 18px;
 }
 
 .logout-btn:hover,

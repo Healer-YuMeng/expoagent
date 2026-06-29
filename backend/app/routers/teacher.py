@@ -22,7 +22,6 @@ from app.routers.parent import (
     WELCOME_MESSAGE_KEY,
 )
 from app.services.langchain_service import get_langchain_service
-from app.services.channel_metrics import get_channel_stats, CHANNEL_CONFIG
 from app.routers.utils import build_lead_chat_lookup
 
 logger = logging.getLogger(__name__)
@@ -321,32 +320,12 @@ async def get_teacher_dashboard(
         "needs_manual_callback": True
     })
 
-    now = datetime.utcnow()
-    date_keys = {
-        "daily": now.strftime("%Y-%m-%d"),
-        "monthly": now.strftime("%Y-%m"),
-        "yearly": now.strftime("%Y"),
-    }
-    source_stats: dict[str, list[dict[str, object]]] = {}
-    for period, date_key in date_keys.items():
-        stats_map = await get_channel_stats(db, period, date_key)
-        source_stats[period] = [
-            {
-                "channel": slug,
-                "label": CHANNEL_CONFIG[slug],
-                "visits": values["visits"],
-                "appointments": values["appointments"],
-            }
-            for slug, values in stats_map.items()
-        ]
-
     return {
         "today_consultations": today_consultations,
         "valid_leads": valid_leads,
         "urgent_followups": urgent_followups,
         "pending_appointments": pending_appointments,
         "manual_callbacks": manual_callbacks,
-        "source_stats": source_stats,
     }
 
 

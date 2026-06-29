@@ -17,7 +17,6 @@ export const CHANNELS: ChannelInfo[] = [
 
 const START_CHAT_PATH = '/start-chat';
 const SOURCE_STORAGE_KEY = 'ycis_channel_source';
-const VISIT_FLAG_PREFIX = 'ycis_channel_visit_logged_';
 
 function isAbsoluteUrl(value: string): boolean {
   return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(value);
@@ -63,15 +62,6 @@ export function captureSourceFromQuery(query: Record<string, unknown>): ChannelS
 export function getPersistedChannelSource(): ChannelSlug | null {
   const stored = sessionStorage.getItem(SOURCE_STORAGE_KEY);
   return normalizeChannelSource(stored);
-}
-
-export function shouldTrackVisit(slug: ChannelSlug): boolean {
-  const key = `${VISIT_FLAG_PREFIX}${slug}`;
-  if (sessionStorage.getItem(key)) {
-    return false;
-  }
-  sessionStorage.setItem(key, '1');
-  return true;
 }
 
 export function buildStartChatEntryUrl(base: string, params: Record<string, string> = {}): string {

@@ -34,8 +34,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import QRCode from 'qrcode';
 import PaintBackground from '@/components/PaintBackground.vue';
-import { buildStartChatEntryUrl, captureSourceFromQuery, shouldTrackVisit } from '@/utils/channelSource';
-import { trackChannelVisit } from '@/api/channelMetrics';
+import { buildStartChatEntryUrl, captureSourceFromQuery } from '@/utils/channelSource';
 import { getAppStorageItem } from '@/utils/browserStorage';
 
 const router = useRouter();
@@ -74,12 +73,7 @@ onMounted(() => {
   if (savedLocale && locale.value !== savedLocale) {
     locale.value = savedLocale
   }
-  const normalized = captureSourceFromQuery(route.query);
-  if (normalized && shouldTrackVisit(normalized)) {
-    trackChannelVisit(normalized).catch((err) => {
-      console.warn('trackChannelVisit failed', err);
-    });
-  }
+  captureSourceFromQuery(route.query);
 });
 </script>
 
