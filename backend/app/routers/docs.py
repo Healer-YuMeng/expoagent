@@ -22,6 +22,7 @@ from app.services.rag_vector_store import (
     build_rag_vector_collection_name,
     build_rag_vector_persist_dir,
 )
+from app.services.rag_result_filter import filter_live_rag_results
 from app.services.url_ingest import UrlIngestor
 from app.services import rag_search
 from app.services.rag_chunking import ensure_parent_chunk_metadata
@@ -675,6 +676,12 @@ async def query_docs(
         bm25_weight=0.3,
         school_key=school_id,
         aggregate_parents=False,
+    )
+    results = await filter_live_rag_results(
+        db,
+        school_id=school_id,
+        items=results,
+        knowledge_base_ids=[knowledge_base_id] if knowledge_base_id else None,
     )
     doc_ids: set[str] = set()
     for item in results:
