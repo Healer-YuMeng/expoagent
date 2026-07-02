@@ -21,6 +21,7 @@ from app.models.message import MessageSchema
 from app.core.dependencies import get_current_parent
 from app.services.langchain_service import get_langchain_service, LangchainService
 from app.services import rag_search
+from app.services.rag_result_filter import filter_live_rag_results
 from app.routers.utils import build_lead_chat_lookup
 from app.services.assistant_service import AssistantService
 from app.core.config import settings
@@ -2053,6 +2054,19 @@ async def send_message(
                 )
                 logger.info(
                     "知识库检索完成: conversation=%s effective_school_id=%s hits=%d query=%s",
+                    conversation_id,
+                    effective_school_id,
+                    len(retrieved_docs),
+                    request.content,
+                )
+                retrieved_docs = await filter_live_rag_results(
+                    db,
+                    school_id=effective_school_id,
+                    items=retrieved_docs,
+                    knowledge_base_ids=assistant_knowledge_base_ids or None,
+                )
+                logger.info(
+                    "知识库活数据过滤完成: conversation=%s effective_school_id=%s live_hits=%d query=%s",
                     conversation_id,
                     effective_school_id,
                     len(retrieved_docs),
